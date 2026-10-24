@@ -1,22 +1,23 @@
 import { now } from '@core/clock';
+import { serviceClient } from '@core/db';
 import { isDemo } from '@core/config/data-mode';
 import { eventBus } from '@core/events/bus';
 import type { Notifier } from '@core/notifications';
 import { getProviders } from '@core/providers';
 import { getBus } from './bus-ref';
 import { createReminderService, type ReminderService } from './service';
-import { MemoryStore } from './store';
+import { SupabaseStore } from './supabase-store';
+import { MemoryStore, type ReminderStore } from './store';
 
 /** Module-level wiring: handlers receive no dependencies, so the service is resolved here. */
 let service: ReminderService | undefined;
 let builtWith: unknown;
-let store: MemoryStore | undefined;
+let store: ReminderStore | undefined;
 let providers: ReturnType<typeof getProviders> | undefined;
 
-export function getStore(): MemoryStore {
-  // Fail loud: in live mode a memory store would silently lose real reminders on restart.
-  if (!isDemo()) throw new Error('reminders: no live store yet (Supabase store not implemented)');
-  return (store ??= new MemoryStore());
+export function getStore(): ReminderStore {
+  // demo: in memory (resets on restart). live: Postgres via the service-role client (server only).
+  return (store ??= isDemo() ? new MemoryStore() : new SupabaseStore(serviceClient()));
 }
 
 const notifier = (): Notifier => (providers ??= getProviders()).notifier;

@@ -30,9 +30,11 @@ Circle members have no access at all. **Not built yet:** video confirmation of p
 
 ## Data owned
 
-`MemoryStore` (demo only). **No live store yet**: in live mode `getStore()` throws on purpose (no silent data loss).
-Next: Supabase tables `reminders_schedules`, `reminders_occurrences` (RLS on, server uses service role), migration
-`reminders__YYYYMMDDHHmm_init.sql`.
+Tables `reminders_schedules`, `reminders_occurrences` (migration `reminders__202610250002_init.sql`). RLS is ON with no
+policies and no grants to anon/authenticated: ONLY the API (service role, `core/db`) reads or writes them.
+Store: demo = `MemoryStore` (resets on restart); live = `SupabaseStore`. Every store must pass `store-contract.ts`.
+Apply the schema with `npm run db:push` (dry run: `db:push:dry`), prove the anon key sees nothing with `npm run db:probe`,
+and run the contract against the real project with `npm run test:store:live`.
 
 ## Demo data
 
@@ -59,8 +61,9 @@ speeding up or skipping demo time fires it immediately. Live: the API process ru
 
 ## Open items / decisions for later
 
-- **No live store**: `MemoryStore` is demo-only and live mode throws on purpose. Needs an async `ReminderStore`
-  (Supabase), tables `reminders_schedules` / `reminders_occurrences` with RLS, and a real login (verifier is a stub).
+- **Live login** (verifier is still a stub): live mode can store data but nobody can sign in yet.
+- Known limit: the "no two pills in 2h" check spans two rows, so two simultaneous confirms of different pills could both
+  pass. Closing it needs a Postgres function.
 - **No real push**: prompts go to the mock notifier; the patient sees them in the app. `expo-notifications` needs a dev build.
 - Video pill confirmation: `Confirmation.method: 'video'` and `verification` states are modelled; low-confidence results
   must go to caregiver review (root rules).

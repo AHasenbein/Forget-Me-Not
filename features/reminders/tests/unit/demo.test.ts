@@ -29,11 +29,11 @@ describe('demo mode', () => {
     const pill = (await getStore().getSchedule('demo-sched-demo-rem-1'))!;
     expect(pill.localTime).toBe('08:02'); // 12:02Z = 08:02 EDT
   });
-  it('refuses to run its memory store in live mode (fail loud, no silent data loss)', async () => {
+  it('live mode never falls back to memory: it needs the database config (fail loud)', async () => {
     const prev = process.env.DATA_MODE;
     process.env.DATA_MODE = 'live';
     try {
-      expect(() => getStore()).toThrow(/no live store/);
+      expect(() => getStore()).toThrow(/required in live mode/);
     } finally {
       if (prev === undefined) delete process.env.DATA_MODE;
       else process.env.DATA_MODE = prev;
