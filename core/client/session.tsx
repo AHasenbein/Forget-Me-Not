@@ -12,6 +12,7 @@ import type { Role } from '@contracts/circle';
 import { TextScaleContext } from '../design-system/text-scale';
 import { isDemo } from '../config/data-mode';
 import { apiCall, ApiError, type ApiFn } from './api';
+import type { QuickAccount } from '../auth/quick-login';
 import { authClient } from './supabase';
 
 /** Demo personas map to the demo tokens the API accepts in demo mode. */
@@ -42,6 +43,9 @@ interface Session {
   email: string | null;
   setPersona(p: Persona): void;
   signIn(email: string, password: string): Promise<string | null>;
+  /** Dev convenience: pick one of the seeded accounts (needs QUICK_LOGIN=on on the API and EXPO_PUBLIC_QUICK_LOGIN=on here). */
+  quickLogin: boolean;
+  signInAs(account: QuickAccount): Promise<string | null>;
   signOut(): Promise<void>;
   textScale: number;
   setTextScale(s: number): void;
@@ -133,6 +137,23 @@ export function SessionProvider({ children }: { children: ReactNode }) {
     const { error } = await authClient().auth.signInWithPassword({ email: e.trim(), password });
     return error ? 'That email or password isn’t right.' : null; // same message either way: no account hints
   }, []);
+  const quickLogin = process.env.EXPO_PUBLIC_QUICK_LOGIN === 'on'; // literal access so Expo inlines it
+  const signInAs = useCallback(async (account: QuickAccount) => {
+    try {
+      const s = await apiCall<{ access_token: string; refresh_token: string }>(
+        null,
+        'POST',
+        '/dev/quick-login',
+        { account },
+      );
+      const { error } = await authClient().auth.setSession(s);
+      return error ? 'That didn’t work. Please try again.' : null;
+    } catch (e) {
+      return e instanceof ApiError && e.status === 404
+        ? 'Quick sign-in is not turned on. Use email and password.'
+        : 'I can’t reach the app right now. Please try again in a moment.';
+    }
+  }, []);
   const signOut = useCallback(async () => {
     await authClient().auth.signOut();
   }, []);
@@ -151,6 +172,8 @@ export function SessionProvider({ children }: { children: ReactNode }) {
       email,
       setPersona,
       signIn,
+      quickLogin,
+      signInAs,
       signOut,
       textScale,
       setTextScale,
@@ -165,6 +188,8 @@ export function SessionProvider({ children }: { children: ReactNode }) {
       email,
       setPersona,
       signIn,
+      quickLogin,
+      signInAs,
       signOut,
       textScale,
       setTextScale,
