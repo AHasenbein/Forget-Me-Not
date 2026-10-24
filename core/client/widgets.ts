@@ -6,7 +6,9 @@ import type { Widget } from '../feature-registry/ui';
 
 /** Features shown in the app: everything in demo mode, else only those enabled by default (client flags: Stage 2). */
 const featureOn = (name: string, demo: boolean) =>
-  demo || manifests.find((m) => m.name === name)?.enabledByDefault === true;
+  demo ||
+  process.env.EXPO_PUBLIC_FEATURE_ALL === 'on' || // literal access so Expo inlines it
+  manifests.find((m) => m.name === name)?.enabledByDefault === true;
 
 export function widgetsFor(role: Role, demo = isDemo()): Widget[] {
   return Object.entries(uis)

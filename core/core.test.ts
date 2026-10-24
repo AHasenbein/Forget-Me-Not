@@ -69,6 +69,16 @@ describe('feature flags + server', () => {
     expect((await app.request('/api/demo-x/p', { headers: bearer(member) })).status).toBe(403);
     expect((await app.request('/api/demo-x/p', { headers: bearer(patient) })).status).toBe(200);
   });
+  it('/api/me returns only the role to a signed-in user, 401 otherwise', async () => {
+    const app = mk({});
+    expect((await app.request('/api/me')).status).toBe(401);
+    expect(
+      (await app.request('/api/me', { headers: { authorization: 'Bearer test:nobody' } })).status,
+    ).toBe(401);
+    const res = await app.request('/api/me', { headers: bearer(patient) });
+    expect(res.status).toBe(200);
+    expect(await res.json()).toEqual({ id: patient.id, role: 'patient', hasPatient: true });
+  });
   it('enforces circle grants server-side (deny by default)', async () => {
     const granted = createCircleMember(patient, { locationGrant: true });
     const app = createApp({

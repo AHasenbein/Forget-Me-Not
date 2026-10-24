@@ -26,6 +26,13 @@ export function createApp({
 }: AppDeps) {
   const app = new Hono();
   app.get('/health', (c) => c.json({ ok: true }));
+  // Who am I? Lets the client pick the right dashboard. 401 for anyone without a valid token AND a profile.
+  app.get('/api/me', async (c) => {
+    const header = c.req.header('authorization') ?? '';
+    const user = header.startsWith('Bearer ') ? await verifier.verify(header.slice(7)) : null;
+    if (!user) return c.json({ error: 'unauthenticated' }, 401);
+    return c.json({ id: user.id, role: user.role, hasPatient: user.patientId !== null });
+  });
 
   for (const m of manifests) {
     if (!isEnabled(m, env)) continue; // inert: no routes, no subscriptions

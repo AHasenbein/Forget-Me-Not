@@ -13,9 +13,9 @@
     "dev": "npm run gen:registry && expo start --dev-client",
     "dev:api": "tsx watch scripts/dev-api.ts",
     "dev:demo": "cross-env DATA_MODE=demo EXPO_PUBLIC_DATA_MODE=demo FEATURE_ALL=on npm run dev",
-    "dev:live": "cross-env DATA_MODE=live EXPO_PUBLIC_DATA_MODE=live npm run dev",
+    "dev:live": "cross-env DATA_MODE=live EXPO_PUBLIC_DATA_MODE=live EXPO_PUBLIC_FEATURE_ALL=on npm run dev",
     "dev:api:demo": "cross-env DATA_MODE=demo FEATURE_ALL=on npm run dev:api",
-    "dev:api:live": "cross-env DATA_MODE=live npm run dev:api",
+    "dev:api:live": "cross-env DATA_MODE=live DATA_MODE_AI=demo DATA_MODE_PLAID=demo DATA_MODE_NOTIFIER=demo DATA_MODE_LOCATION=demo FEATURE_ALL=on node --env-file=.env --import tsx scripts/dev-api.ts",
     "gen:registry": "tsx scripts/gen-registry.ts",
     "lint": "eslint . --max-warnings 0",
     "format": "prettier --write .",
@@ -34,7 +34,8 @@
     "db:push:dry": "npm run sync-migrations && npx supabase db push --dry-run --linked",
     "db:push": "npm run sync-migrations && npx supabase db push --linked",
     "db:probe": "node --env-file=.env --import tsx scripts/probe-rls.ts",
-    "test:store:live": "cross-env REMINDERS_TEST_SUPABASE=1 node --env-file=.env node_modules/vitest/vitest.mjs run features/reminders/tests/unit/store-supabase.test.ts"
+    "test:store:live": "cross-env REMINDERS_TEST_SUPABASE=1 node --env-file=.env node_modules/vitest/vitest.mjs run features/reminders/tests/unit/store-supabase.test.ts",
+    "seed:live": "node --env-file=.env --import tsx scripts/seed-live-users.ts"
   },
   "lint-staged": {
     "*.{ts,tsx,js,mjs,json,md,yml,yaml}": "prettier --write",
@@ -63,6 +64,7 @@
     "react-native": "^0.86.3",
     "react-native-safe-area-context": "~5.7.0",
     "react-native-screens": "~4.26.0",
+    "react-native-url-polyfill": "^4.0.0",
     "react-native-web": "^0.21.4",
     "zod": "^4.6.7"
   },

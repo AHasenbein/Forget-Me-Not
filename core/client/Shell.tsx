@@ -15,6 +15,7 @@ import { palette } from '../design-system/tokens';
 import { ApiError } from './api';
 import { usePoll } from './hooks';
 import { formatTime } from './format';
+import { SignIn } from './SignIn';
 import { PERSONAS, TEXT_SIZES, useSession } from './session';
 import { widgetsFor } from './widgets';
 
@@ -81,8 +82,8 @@ export function TopBar() {
 }
 
 function Widgets() {
-  const { role, persona } = useSession();
-  const widgets = widgetsFor(role);
+  const { role, token } = useSession();
+  const widgets = role ? widgetsFor(role) : [];
   if (!widgets.length)
     return (
       <Card>
@@ -92,7 +93,7 @@ function Widgets() {
   return (
     <>
       {widgets.map((w) => (
-        <w.Component key={`${persona}:${w.id}`} />
+        <w.Component key={`${token}:${w.id}`} />
       ))}
     </>
   );
@@ -104,15 +105,23 @@ const today = () =>
   );
 
 export function Home() {
-  const { role, demo, token } = useSession();
-  if (!demo && !token)
+  const { role, liveStatus, signOut } = useSession();
+  if (liveStatus === 'loading')
+    return (
+      <Screen>
+        <Card>
+          <AppText center>One moment…</AppText>
+        </Card>
+      </Screen>
+    );
+  if (liveStatus === 'signed_out') return <SignIn />;
+  if (liveStatus === 'no_access')
     return (
       <Screen>
         <Card tone="warn">
-          <AppText variant="title">Sign-in isn’t built yet</AppText>
-          <AppText>
-            Live mode needs the Stage 2 login. Use demo mode for now: npm run dev:demo.
-          </AppText>
+          <AppText variant="title">You’re signed in, but this account isn’t set up yet</AppText>
+          <AppText>Ask your caregiver to add you.</AppText>
+          <BigButton label="Sign out" tone="ghost" onPress={signOut} />
         </Card>
       </Screen>
     );
@@ -224,7 +233,7 @@ function DemoTools() {
 }
 
 export function SettingsScreen() {
-  const { demo, role, textScale, setTextScale } = useSession();
+  const { demo, role, textScale, setTextScale, email, signOut } = useSession();
   return (
     <Screen>
       <AppText variant="huge">Settings</AppText>
@@ -246,6 +255,8 @@ export function SettingsScreen() {
       <Card>
         <AppText variant="title">About</AppText>
         <AppText tone="muted">{demo ? 'Demo mode: canned, made-up data.' : 'Live mode.'}</AppText>
+        {!demo && email ? <AppText tone="muted">Signed in as {email}</AppText> : null}
+        {!demo ? <BigButton label="Sign out" tone="ghost" onPress={signOut} /> : null}
         {role === 'circle_member' ? (
           <AppText tone="muted">Family and friends can’t change app settings.</AppText>
         ) : null}
