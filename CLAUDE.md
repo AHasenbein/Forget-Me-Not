@@ -99,6 +99,20 @@ tests/             architecture/ (boundary, route-auth), smoke/, e2e/, integrati
   ahead, reset. Seed canned data RELATIVE to demo "now" (first reminder due in 2 min), never at fixed clock times.
   The app shows the server's `now`, not the device clock. Phones: `EXPO_PUBLIC_API_URL=http://<your-LAN-ip>:8787`.
 
+## Live mode quickstart (real login + real database)
+
+1. `.env`: Supabase URL/keys (+ `SUPABASE_DB_PASSWORD`), and `SEED_PASSWORD` (12+ chars). 2. `npm run db:push` (applies
+   `core/db/migrations` + every feature's migrations), then `npm run db:probe` (must print only PASS: the public anon key reads
+   and writes nothing). 3. `npm run seed:live` creates 4 fictional accounts (`margaret.patient@`, `casey.caregiver@`,
+   `dana.daughter@`, `fred.friend@` `example.com`) linked to one patient. 4. `npm run dev:api:live` + `npm run dev:live`, sign in.
+
+- Auth: the API validates the token with Supabase Auth, then reads role / patient / grants from OUR `profiles` table. **Never
+  trust `user_metadata`** (users can edit it). No profile row = no access, because signups are open. Consider disabling public
+  signups in the Supabase dashboard (Authentication > Providers > Email).
+- Every table: RLS ON, **no policies, no grants to anon/authenticated**; only the API (service role, `core/db`) touches data.
+  The service-role key lives only in the API's `.env` / secret store, never in `EXPO_PUBLIC_*`.
+- Live still uses demo adapters for AI, Plaid, push and location (`DATA_MODE_<SERVICE>=demo`) until their live ones exist.
+
 ## Commands
 
 ```

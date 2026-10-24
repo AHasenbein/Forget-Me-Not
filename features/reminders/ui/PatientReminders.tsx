@@ -5,7 +5,9 @@ import { formatTime } from '@core/client/format';
 import { usePoll } from '@core/client/hooks';
 import { useSession } from '@core/client/session';
 import { AppText, BigButton, Card, Stack } from '@core/design-system/components';
-import { KIND, patientError, pickPatientFocus, type TodayResponse } from './model';
+import type { VisionFrame } from '@core/ai/vision';
+import { checkError, KIND, patientError, pickPatientFocus, type TodayResponse } from './model';
+import { PillCamera } from './PillCamera';
 
 const BASE = '/api/reminders';
 const Emoji = ({ children }: { children: string }) => (
@@ -14,13 +16,17 @@ const Emoji = ({ children }: { children: string }) => (
 
 /** Patient view: ONE card, ONE primary button. Plain words, no codes. */
 export function PatientReminders() {
-  const { api, persona } = useSession();
+  const { api, token } = useSession();
   const { data, error, reload } = usePoll(() => api<TodayResponse>('GET', `${BASE}/today`), 2000, [
-    persona,
+    token,
   ]);
   const [busy, setBusy] = useState(false);
   const [problem, setProblem] = useState('');
   const [justId, setJustId] = useState<string | null>(null);
+  /** After tapping "I took it" on a pill: the optional "show me" step. */
+  const [offer, setOffer] = useState<string | null>(null);
+  const [camera, setCamera] = useState(false);
+  const [note, setNote] = useState('');
 
   useEffect(() => {
     if (!justId) return;
@@ -28,13 +34,30 @@ export function PatientReminders() {
     return () => clearTimeout(t);
   }, [justId]);
 
-  const run = async (path: string, confirmId?: string) => {
+  /** The tap already counted. Whatever happens to the photos, the patient ends on "thank you". */
+  const sendPhotos = async (frames: VisionFrame[]) => {
+    const id = offer;
+    setCamera(false);
+    setOffer(null);
+    setNote('');
+    if (!id) return;
+    try {
+      await api('POST', `${BASE}/occurrences/${id}/pill-check`, { frames });
+    } catch (e) {
+      setNote(checkError(e instanceof ApiError ? e.code : 'offline'));
+    }
+    setJustId(id);
+    reload();
+  };
+
+  const run = async (path: string, confirmId?: string, isPill = false) => {
     if (busy) return;
     setBusy(true);
     setProblem('');
     try {
       await api('POST', `${BASE}${path}`);
       if (confirmId) setJustId(confirmId);
+      if (confirmId && isPill) setOffer(confirmId);
       reload();
     } catch (e) {
       setProblem(patientError(e instanceof ApiError ? e.code : 'offline'));
@@ -78,7 +101,7 @@ export function PatientReminders() {
           tone="success"
           label={k.done}
           busy={busy}
-          onPress={() => run(`/occurrences/${o.id}/confirm`, o.id)}
+          onPress={() => run(`/occurrences/${o.id}/confirm`, o.id, o.kind === 'pill')}
         />
         {focus.canSnooze ? (
           <BigButton
@@ -110,7 +133,7 @@ export function PatientReminders() {
           <BigButton
             label={KIND[o.kind].done}
             busy={busy}
-            onPress={() => run(`/occurrences/${o.id}/confirm`, o.id)}
+            onPress={() => run(`/occurrences/${o.id}/confirm`, o.id, o.kind === 'pill')}
           />
         )}
       </Card>
@@ -150,9 +173,38 @@ export function PatientReminders() {
     );
   }
 
+  if (offer && focus.kind !== 'task') {
+    card = camera ? (
+      <PillCamera
+        onFrames={sendPhotos}
+        onSkip={() => {
+          setCamera(false);
+          setOffer(null);
+        }}
+      />
+    ) : (
+      <Card tone="success">
+        <Emoji>✅</Emoji>
+        <AppText variant="huge" center tone="success">
+          Thank you!
+        </AppText>
+        <AppText center>
+          One more thing, if you like: show your pill to the camera. It helps your caregiver.
+        </AppText>
+        <BigButton size="huge" label="Open camera" onPress={() => setCamera(true)} />
+        <BigButton tone="ghost" label="No thanks" onPress={() => setOffer(null)} />
+      </Card>
+    );
+  }
+
   return (
     <Stack>
       {card}
+      {note ? (
+        <Card>
+          <AppText center>{note}</AppText>
+        </Card>
+      ) : null}
       {problem ? (
         <Card tone="danger">
           <AppText center>{problem}</AppText>

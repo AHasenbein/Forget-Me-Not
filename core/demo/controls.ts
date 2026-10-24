@@ -4,6 +4,7 @@ import { getSpeed, jump, MAX_SPEED, now, setSpeed } from '../clock';
 import { isDemo } from '../config/data-mode';
 import type { FeatureManifest } from '../feature-registry/manifest';
 import { resetDemo } from './reset';
+import { getVisionOutcome, setVisionOutcome, VISION_OUTCOMES, type VisionOutcome } from './vision';
 
 /**
  * Demo-only dev tools (speed up time, jump, reset). Mounted by the dev API ONLY; every route is 404
@@ -43,6 +44,14 @@ export function createDemoControls(deps: {
       return c.json({ error: 'invalid_input' }, 400);
     }
     return c.json(state());
+  });
+  app.get('/vision', (c) => c.json({ outcome: getVisionOutcome(), options: VISION_OUTCOMES }));
+  app.post('/vision', async (c) => {
+    const o = (await body(c)).outcome;
+    if (!(VISION_OUTCOMES as readonly unknown[]).includes(o))
+      return c.json({ error: 'invalid_input' }, 400);
+    setVisionOutcome(o as VisionOutcome);
+    return c.json({ outcome: o, options: VISION_OUTCOMES });
   });
   app.post('/reset', async (c) =>
     c.json({ seeded: await resetDemo(deps.manifests, deps.env), ...state() }),

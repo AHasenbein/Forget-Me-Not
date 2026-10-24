@@ -1,4 +1,4 @@
-import { Link, usePathname } from 'expo-router';
+import { Link, usePathname, useRouter } from 'expo-router';
 import { useState } from 'react';
 import { Pressable, View } from 'react-native';
 import {
@@ -15,6 +15,7 @@ import { palette } from '../design-system/tokens';
 import { ApiError } from './api';
 import { usePoll } from './hooks';
 import { formatTime } from './format';
+import { SignIn } from './SignIn';
 import { PERSONAS, TEXT_SIZES, useSession } from './session';
 import { widgetsFor } from './widgets';
 
@@ -81,8 +82,8 @@ export function TopBar() {
 }
 
 function Widgets() {
-  const { role, persona } = useSession();
-  const widgets = widgetsFor(role);
+  const { role, token } = useSession();
+  const widgets = role ? widgetsFor(role) : [];
   if (!widgets.length)
     return (
       <Card>
@@ -92,7 +93,7 @@ function Widgets() {
   return (
     <>
       {widgets.map((w) => (
-        <w.Component key={`${persona}:${w.id}`} />
+        <w.Component key={`${token}:${w.id}`} />
       ))}
     </>
   );
@@ -104,15 +105,23 @@ const today = () =>
   );
 
 export function Home() {
-  const { role, demo, token } = useSession();
-  if (!demo && !token)
+  const { role, liveStatus, signOut } = useSession();
+  if (liveStatus === 'loading')
+    return (
+      <Screen>
+        <Card>
+          <AppText center>One moment…</AppText>
+        </Card>
+      </Screen>
+    );
+  if (liveStatus === 'signed_out') return <SignIn />;
+  if (liveStatus === 'no_access')
     return (
       <Screen>
         <Card tone="warn">
-          <AppText variant="title">Sign-in isn’t built yet</AppText>
-          <AppText>
-            Live mode needs the Stage 2 login. Use demo mode for now: npm run dev:demo.
-          </AppText>
+          <AppText variant="title">You’re signed in, but this account isn’t set up yet</AppText>
+          <AppText>Ask your caregiver to add you.</AppText>
+          <BigButton label="Sign out" tone="ghost" onPress={signOut} />
         </Card>
       </Screen>
     );
@@ -147,6 +156,10 @@ const JUMPS: [string, number][] = [
   ['+2 hours', 120],
 ];
 
+interface Vision {
+  outcome: string;
+  options: string[];
+}
 interface Clock {
   now: string;
   speed: number;
@@ -155,6 +168,11 @@ interface Clock {
 function DemoTools() {
   const { api } = useSession();
   const { data: clock, error, reload } = usePoll(() => api<Clock>('GET', '/demo/clock'), 2000, []);
+  const { data: vision, reload: reloadVision } = usePoll(
+    () => api<Vision>('GET', '/demo/vision'),
+    4000,
+    [],
+  );
   const [busy, setBusy] = useState(false);
   const [note, setNote] = useState('');
   const act = async (label: string, method: string, path: string, body?: unknown) => {
@@ -208,6 +226,22 @@ function DemoTools() {
           />
         ))}
       </Row>
+      <AppText variant="small" tone="muted">
+        Pill photo check: what the next check will “see”
+      </AppText>
+      <Row gap={8}>
+        {(vision?.options ?? []).map((o) => (
+          <Chip
+            key={o}
+            label={{ clear: 'Clear', unclear: 'Unclear', not_taken: 'Not taken' }[o] ?? o}
+            selected={vision?.outcome === o}
+            onPress={() => {
+              void act(`Next check: ${o}`, 'POST', '/demo/vision', { outcome: o });
+              reloadVision();
+            }}
+          />
+        ))}
+      </Row>
       <BigButton
         label="Reset demo"
         tone="danger"
@@ -224,7 +258,8 @@ function DemoTools() {
 }
 
 export function SettingsScreen() {
-  const { demo, role, textScale, setTextScale } = useSession();
+  const { demo, role, textScale, setTextScale, email, signOut } = useSession();
+  const router = useRouter();
   return (
     <Screen>
       <AppText variant="huge">Settings</AppText>
@@ -246,6 +281,17 @@ export function SettingsScreen() {
       <Card>
         <AppText variant="title">About</AppText>
         <AppText tone="muted">{demo ? 'Demo mode: canned, made-up data.' : 'Live mode.'}</AppText>
+        {!demo && email ? <AppText tone="muted">Signed in as {email}</AppText> : null}
+        {!demo && email ? (
+          <BigButton
+            label="Sign out"
+            tone="ghost"
+            onPress={async () => {
+              await signOut();
+              router.replace('/'); // back to the "Who are you?" screen
+            }}
+          />
+        ) : null}
         {role === 'circle_member' ? (
           <AppText tone="muted">Family and friends can’t change app settings.</AppText>
         ) : null}

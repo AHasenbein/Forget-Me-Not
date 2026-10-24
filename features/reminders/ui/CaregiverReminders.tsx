@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { Image, View } from 'react-native';
 import { ApiError } from '@core/client/api';
 import { daysLabel, formatTime } from '@core/client/format';
 import { usePoll } from '@core/client/hooks';
@@ -19,6 +20,7 @@ import {
   caregiverCounts,
   caregiverError,
   caregiverRows,
+  type CaregiverRow,
   KIND,
   normalizeTime,
   type OccurrenceView,
@@ -26,21 +28,25 @@ import {
 } from './model';
 
 const BASE = '/api/reminders';
+interface PhotoSet {
+  frames: { mediaType: string; data: string }[];
+}
 interface History {
   days: number;
   summary: { confirmed: number; missed: number; skipped: number };
 }
 
 export function CaregiverReminders() {
-  const { api, persona } = useSession();
-  const today = usePoll(() => api<TodayResponse>('GET', `${BASE}/today`), 2000, [persona]);
-  const schedules = usePoll(() => api<Schedule[]>('GET', `${BASE}/schedules`), 4000, [persona]);
-  const history = usePoll(() => api<History>('GET', `${BASE}/history?days=7`), 8000, [persona]);
+  const { api, token } = useSession();
+  const today = usePoll(() => api<TodayResponse>('GET', `${BASE}/today`), 2000, [token]);
+  const schedules = usePoll(() => api<Schedule[]>('GET', `${BASE}/schedules`), 4000, [token]);
+  const history = usePoll(() => api<History>('GET', `${BASE}/history?days=7`), 8000, [token]);
   const [problem, setProblem] = useState('');
   const [busyId, setBusyId] = useState<string | null>(null);
   const [kind, setKind] = useState<ReminderKind>('pill');
   const [time, setTime] = useState('');
   const [confirmDelete, setConfirmDelete] = useState<string | null>(null);
+  const [photos, setPhotos] = useState<Record<string, PhotoSet>>({});
 
   const refresh = () => {
     today.reload();
@@ -69,6 +75,27 @@ export function CaregiverReminders() {
   const hhmm = normalizeTime(time);
 
   const markDone = (o: OccurrenceView) => call(o.id, 'POST', `/occurrences/${o.id}/confirm`);
+  const reviews = rows.filter((r) => r.needsReview);
+  const viewPhotos = async (id: string) => {
+    if (busyId) return;
+    setBusyId(id);
+    setProblem('');
+    try {
+      const got = await api<PhotoSet>('GET', `${BASE}/occurrences/${id}/frames`);
+      setPhotos((p) => ({ ...p, [id]: got }));
+    } catch (e) {
+      setProblem(caregiverError(e instanceof ApiError ? e.code : 'offline'));
+    } finally {
+      setBusyId(null);
+    }
+  };
+  const review = async (id: string, decision: 'approve' | 'reject') => {
+    await call(id, 'POST', `/occurrences/${id}/review`, { decision });
+    setPhotos((p) => {
+      const { [id]: _gone, ...rest } = p;
+      return rest;
+    });
+  };
 
   return (
     <Stack>
@@ -93,6 +120,17 @@ export function CaregiverReminders() {
           </AppText>
         ) : null}
       </Card>
+
+      {reviews.map((r) => (
+        <ReviewCard
+          key={r.occurrence.id}
+          row={r}
+          photos={photos[r.occurrence.id]}
+          busy={busyId === r.occurrence.id}
+          onView={() => viewPhotos(r.occurrence.id)}
+          onDecide={(d) => review(r.occurrence.id, d)}
+        />
+      ))}
 
       {attention.map((r) => (
         <Card key={r.occurrence.id} tone="danger">
@@ -122,6 +160,7 @@ export function CaregiverReminders() {
             <AppText>{KIND[r.occurrence.kind].emoji}</AppText>
             <AppText bold>{KIND[r.occurrence.kind].label}</AppText>
             <Badge label={r.status} tone={r.tone} />
+            {r.check ? <Badge label={r.check.label} tone={r.check.tone} /> : null}
             {r.canMarkDone && !r.needsAttention ? (
               <Chip label="Mark done" onPress={() => void markDone(r.occurrence)} />
             ) : null}
@@ -208,5 +247,57 @@ export function CaregiverReminders() {
         </Card>
       ) : null}
     </Stack>
+  );
+}
+
+function ReviewCard({
+  row,
+  photos,
+  busy,
+  onView,
+  onDecide,
+}: {
+  row: CaregiverRow;
+  photos?: PhotoSet;
+  busy: boolean;
+  onView: () => void;
+  onDecide: (d: 'approve' | 'reject') => void;
+}) {
+  const wrong = row.occurrence.confirmation?.verification === 'rejected';
+  return (
+    <Card tone={wrong ? 'danger' : 'warn'}>
+      <AppText variant="title" tone={wrong ? 'danger' : 'warn'}>
+        💊 {wrong ? 'The pill photos look wrong' : 'The pill photos were unclear'}
+      </AppText>
+      <AppText>
+        {wrong
+          ? 'The photos do not seem to show Margaret taking her pill. She tapped “I took it”, so it counts as taken until you decide.'
+          : 'The check could not tell. She tapped “I took it”, so it counts as taken. Look at the photos if you want to be sure.'}
+      </AppText>
+      {photos ? (
+        <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
+          {photos.frames.map((f, i) => (
+            <Image
+              key={i}
+              accessibilityLabel={`Photo ${i + 1}`}
+              source={{ uri: `data:${f.mediaType};base64,${f.data}` }}
+              style={{ width: 140, height: 105, borderRadius: 8, backgroundColor: '#ddd' }}
+            />
+          ))}
+        </View>
+      ) : (
+        <BigButton tone="ghost" label="View photos" busy={busy} onPress={onView} />
+      )}
+      <BigButton label="Looks fine" disabled={busy} onPress={() => onDecide('approve')} />
+      <BigButton
+        tone="danger"
+        label="Not right"
+        disabled={busy}
+        onPress={() => onDecide('reject')}
+      />
+      <AppText variant="small" tone="muted">
+        Photos are deleted when you approve, or after 7 days. Every time you view them is recorded.
+      </AppText>
+    </Card>
   );
 }

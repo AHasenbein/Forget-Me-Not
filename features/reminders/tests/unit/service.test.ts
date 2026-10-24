@@ -7,6 +7,7 @@ import {
   createCircleMember,
   createLinkedPair,
   createMockNotifier,
+  createMockVision,
   createUnlinkedUser,
 } from '@core/testing';
 import { ESCALATE_MIN, MAX_SNOOZES, createReminderService } from '../../service';
@@ -34,6 +35,7 @@ function setup() {
     store: new MemoryStore(),
     bus,
     notifier: () => notifier,
+    vision: () => createMockVision(),
     now: clock.now,
   });
   const { patient, caregiver } = createLinkedPair();
@@ -265,6 +267,7 @@ describe('time zones and DST', () => {
       store: new MemoryStore(),
       bus: new EventBus(),
       notifier: () => createMockNotifier(),
+      vision: () => createMockVision(),
       now: clock.now,
     });
     const { caregiver } = createLinkedPair();
@@ -378,7 +381,14 @@ describe('two processes sharing one store (compare-and-set)', () => {
     const alerts: unknown[] = [];
     bus.on('caregiver.alert', (e) => void alerts.push(e));
     const pushes = createMockNotifier();
-    const mk = () => createReminderService({ store, bus, notifier: () => pushes, now: clock.now });
+    const mk = () =>
+      createReminderService({
+        store,
+        bus,
+        notifier: () => pushes,
+        vision: () => createMockVision(),
+        now: clock.now,
+      });
     return { a: mk(), b: mk(), alerts, pushes, clock, ...createLinkedPair() };
   }
 
