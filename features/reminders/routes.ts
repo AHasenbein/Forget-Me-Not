@@ -12,14 +12,14 @@ export const createSchedule = (c: RouteContext) =>
   getService().createSchedule(user(c), c.body as CreateScheduleInput);
 export const updateSchedule = (c: RouteContext) =>
   getService().updateSchedule(user(c), c.params.id!, c.body as PatchScheduleInput);
-export const deleteSchedule = (c: RouteContext) => {
-  getService().deleteSchedule(user(c), c.params.id!);
+export const deleteSchedule = async (c: RouteContext) => {
+  await getService().deleteSchedule(user(c), c.params.id!);
   return { ok: true };
 };
 // `now` is the SERVER's app time (it can be sped up in demo): clients must use it, not the device clock.
-export const today = (c: RouteContext) => ({
+export const today = async (c: RouteContext) => ({
   now: clockNow().toISOString(),
-  occurrences: getService().today(user(c)),
+  occurrences: await getService().today(user(c)),
 });
 export const history = (c: RouteContext) =>
   getService().history(user(c), Number(c.query.days ?? 7));
