@@ -75,6 +75,24 @@ jobs:
           path: coverage/lcov.info
           if-no-files-found: ignore
 
+  # Proves the repo works for the Windows dev: lint/format (CRLF), tests (paths), feature generator.
+  windows:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ./.github/actions/setup
+      - run: npm run lint
+      - run: npm run format:check
+      - run: npm run typecheck
+      - run: npm test
+      - run: npm run e2e
+      - name: Feature generator smoke test
+        shell: bash
+        run: |
+          npm run new-feature ci-smoke
+          npx vitest run features/ci-smoke --project unit
+          node -e "require('fs').rmSync('features/ci-smoke',{recursive:true,force:true})"
+
   build:
     runs-on: ubuntu-latest
     steps:

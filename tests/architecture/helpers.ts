@@ -1,5 +1,5 @@
 import { readdirSync, readFileSync, statSync } from 'node:fs';
-import { dirname, join, relative, resolve, sep } from 'node:path';
+import { join, posix, relative, sep } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 export const ROOT = fileURLToPath(new URL('../..', import.meta.url));
@@ -48,7 +48,7 @@ export function findBoundaryViolations(files: SourceFile[]): string[] {
         if (spec.startsWith('@features/'))
           problems.push(`${f.path}: imports ${spec} (use event bus or a contract)`);
         if (spec.startsWith('.')) {
-          const target = resolve('/', dirname(f.path), spec).slice(1);
+          const target = posix.join(posix.dirname(f.path), spec); // posix: no drive letters on Windows
           if (!target.startsWith(`features/${parts[1]}/`) && target !== `features/${parts[1]}`)
             problems.push(`${f.path}: relative import ${spec} escapes features/${parts[1]}/`);
         }
