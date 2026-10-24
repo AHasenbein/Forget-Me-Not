@@ -3,6 +3,8 @@ import { Hono } from 'hono';
 import { cors } from 'hono/cors';
 import Anthropic from '@anthropic-ai/sdk';
 import { createClaudeVision } from '../core/ai/claude-vision';
+import { createClient } from '@supabase/supabase-js';
+import { createQuickLogin } from '../core/auth/quick-login';
 import { createVerifier, supabaseAuthPorts } from '../core/auth/supabase-verifier';
 import { dataMode, isDemo } from '../core/config/data-mode';
 import { serviceClient } from '../core/db';
@@ -43,6 +45,29 @@ if (!demo) {
     .split(',')
     .map((o) => o.trim());
   root.use('*', cors({ origin: origins, allowHeaders: ['Authorization', 'Content-Type'] }));
+}
+// Dev convenience: pick-an-account sign-in. Off unless QUICK_LOGIN=on; never in demo or production.
+if (!demo && process.env.QUICK_LOGIN === 'on' && process.env.NODE_ENV !== 'production') {
+  const { SEED_PASSWORD, SUPABASE_URL, SUPABASE_ANON_KEY } = process.env;
+  if (!SEED_PASSWORD || !SUPABASE_URL || !SUPABASE_ANON_KEY)
+    throw new Error('QUICK_LOGIN=on needs SEED_PASSWORD, SUPABASE_URL and SUPABASE_ANON_KEY');
+  const anon = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
+    auth: { persistSession: false, autoRefreshToken: false },
+  });
+  root.route(
+    '/dev',
+    createQuickLogin({
+      enabled: true,
+      password: SEED_PASSWORD,
+      signIn: async (email, password) => {
+        const { data, error } = await anon.auth.signInWithPassword({ email, password });
+        return error || !data.session
+          ? null
+          : { access_token: data.session.access_token, refresh_token: data.session.refresh_token };
+      },
+    }),
+  );
+  console.warn('QUICK LOGIN is ON (localhost only). Never enable it on a deployed server.');
 }
 root.route('/', createApp({ manifests, verifier }));
 
