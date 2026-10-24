@@ -34,6 +34,8 @@ describe('quick login (dev convenience)', () => {
   it('only the four seeded accounts are allowed: no arbitrary emails, no prototype tricks', async () => {
     const { post, signIn } = make();
     for (const account of [
+      'daughter', // seeded, but not offered until circle members have a screen
+      'friend',
       'admin',
       'someone@example.com',
       '__proto__',

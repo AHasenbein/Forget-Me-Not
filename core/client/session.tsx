@@ -19,8 +19,8 @@ import { authClient } from './supabase';
 export const PERSONAS = [
   { id: 'patient', label: 'Patient', role: 'patient' },
   { id: 'caregiver', label: 'Caregiver', role: 'primary_caregiver' },
-  { id: 'daughter', label: 'Daughter', role: 'circle_member' },
-  { id: 'friend', label: 'Friend', role: 'circle_member' },
+  // Circle members (daughter, friend) come back with the friends-family feature; their accounts and the
+  // `demo:daughter` / `demo:friend` tokens still exist, they just have no screen to pick yet.
 ] as const satisfies readonly { id: string; label: string; role: Role }[];
 export type Persona = (typeof PERSONAS)[number]['id'];
 
@@ -155,7 +155,15 @@ export function SessionProvider({ children }: { children: ReactNode }) {
     }
   }, []);
   const signOut = useCallback(async () => {
-    await authClient().auth.signOut();
+    try {
+      // 'local' ends THIS device's session only (a global sign-out would also kick the same account out of
+      // every other tab/phone, and it errors when the session was created by quick login).
+      await authClient().auth.signOut({ scope: 'local' });
+    } catch {
+      /* clear our own state below regardless: the user asked to leave */
+    }
+    setLiveToken(null);
+    setEmail(null);
   }, []);
 
   const api = useCallback<ApiFn>(

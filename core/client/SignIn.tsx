@@ -19,8 +19,6 @@ const input = {
 const CHOICES: { account: QuickAccount; label: string }[] = [
   { account: 'caregiver', label: 'Caregiver' },
   { account: 'patient', label: 'Patient' },
-  { account: 'daughter', label: 'Daughter' },
-  { account: 'friend', label: 'Friend' },
 ];
 
 /** Email + password sign-in (the real thing). Kept intact; the picker below is a dev convenience on top. */

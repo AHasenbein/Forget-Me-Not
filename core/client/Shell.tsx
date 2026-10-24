@@ -1,4 +1,4 @@
-import { Link, usePathname } from 'expo-router';
+import { Link, usePathname, useRouter } from 'expo-router';
 import { useState } from 'react';
 import { Pressable, View } from 'react-native';
 import {
@@ -259,6 +259,7 @@ function DemoTools() {
 
 export function SettingsScreen() {
   const { demo, role, textScale, setTextScale, email, signOut } = useSession();
+  const router = useRouter();
   return (
     <Screen>
       <AppText variant="huge">Settings</AppText>
@@ -281,7 +282,16 @@ export function SettingsScreen() {
         <AppText variant="title">About</AppText>
         <AppText tone="muted">{demo ? 'Demo mode: canned, made-up data.' : 'Live mode.'}</AppText>
         {!demo && email ? <AppText tone="muted">Signed in as {email}</AppText> : null}
-        {!demo ? <BigButton label="Sign out" tone="ghost" onPress={signOut} /> : null}
+        {!demo && email ? (
+          <BigButton
+            label="Sign out"
+            tone="ghost"
+            onPress={async () => {
+              await signOut();
+              router.replace('/'); // back to the "Who are you?" screen
+            }}
+          />
+        ) : null}
         {role === 'circle_member' ? (
           <AppText tone="muted">Family and friends can’t change app settings.</AppText>
         ) : null}

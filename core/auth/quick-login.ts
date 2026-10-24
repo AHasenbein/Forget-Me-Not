@@ -9,8 +9,7 @@ import { Hono } from 'hono';
 export const QUICK_ACCOUNTS = {
   caregiver: 'casey.caregiver@example.com',
   patient: 'margaret.patient@example.com',
-  daughter: 'dana.daughter@example.com',
-  friend: 'fred.friend@example.com',
+  // Circle-member accounts (dana.daughter@, fred.friend@) are seeded but not offered until they have a screen.
 } as const;
 export type QuickAccount = keyof typeof QUICK_ACCOUNTS;
 
