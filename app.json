@@ -1,0 +1,41 @@
+{
+  "expo": {
+    "name": "Forget Me Not",
+    "slug": "forget-me-not",
+    "scheme": "forgetmenot",
+    "version": "0.0.0",
+    "orientation": "portrait",
+    "plugins": [
+      "expo-router",
+      [
+        "expo-location",
+        {
+          "isAndroidBackgroundLocationEnabled": true,
+          "isIosBackgroundLocationEnabled": true,
+          "locationAlwaysAndWhenInUsePermission": "Forget Me Not shares your location with your chosen family only."
+        }
+      ],
+      "expo-notifications",
+      [
+        "expo-camera",
+        {
+          "cameraPermission": "Used to confirm medication with a short video."
+        }
+      ],
+      "expo-video",
+      "expo-audio"
+    ],
+    "ios": {
+      "bundleIdentifier": "app.forgetmenot",
+      "infoPlist": {
+        "UIBackgroundModes": ["location", "fetch", "remote-notification"]
+      }
+    },
+    "android": {
+      "package": "app.forgetmenot"
+    },
+    "web": {
+      "bundler": "metro"
+    }
+  }
+}

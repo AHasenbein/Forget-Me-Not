@@ -1,0 +1,6 @@
+node_modules
+dist
+coverage
+package-lock.json
+core/feature-registry/registry.generated.ts
+supabase/migrations

@@ -1,0 +1,18 @@
+name: setup
+description: Node + cached node_modules + generated feature registry
+runs:
+  using: composite
+  steps:
+    - uses: actions/setup-node@v4
+      with:
+        node-version-file: .nvmrc
+    - id: nm
+      uses: actions/cache@v4
+      with:
+        path: node_modules
+        key: nm-${{ runner.os }}-${{ hashFiles('.nvmrc', 'package-lock.json') }}
+    - if: steps.nm.outputs.cache-hit != 'true'
+      run: npm ci --no-audit --no-fund --ignore-scripts
+      shell: bash
+    - run: npm run gen:registry
+      shell: bash

@@ -1,0 +1,104 @@
+name: CI
+on:
+  pull_request:
+  workflow_call: # reused by deploy.yml on push to main (always full scope)
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  scope:
+    runs-on: ubuntu-latest
+    outputs:
+      scope: ${{ steps.s.outputs.scope }}
+      paths: ${{ steps.s.outputs.paths }}
+    steps:
+      - uses: actions/checkout@v4
+        with: { fetch-depth: 0 }
+      - id: s
+        run: |
+          if [ "${{ github.event_name }}" = "pull_request" ]; then
+            scripts/ci-scope.sh "origin/${{ github.base_ref }}" >> "$GITHUB_OUTPUT"
+          else
+            printf 'scope=all\npaths=\n' >> "$GITHUB_OUTPUT"
+          fi
+          cat "$GITHUB_OUTPUT"
+
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ./.github/actions/setup
+      - run: npm run lint
+      - run: npm run format:check
+
+  typecheck:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ./.github/actions/setup
+      - run: npm run typecheck
+
+  boundary:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ./.github/actions/setup
+      - run: npm run boundary
+
+  test:
+    needs: scope
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ./.github/actions/setup
+      - name: Unit + integration (+ coverage)
+        env:
+          SCOPE: ${{ needs.scope.outputs.scope }}
+          PATHS: ${{ needs.scope.outputs.paths }}
+        run: |
+          if [ "$SCOPE" = "all" ]; then
+            npm run coverage
+          else
+            # Feature-only PR: that feature's tests + architecture/smoke/cross-feature; coverage scoped to the feature.
+            inc=$(for p in $PATHS; do case $p in features/*) printf -- '--coverage.include=%s** ' "$p";; esac; done)
+            npx vitest run --project unit --project integration $PATHS --coverage $inc
+          fi
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: coverage
+          path: coverage/lcov.info
+          if-no-files-found: ignore
+
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ./.github/actions/setup
+      - run: npm run build
+
+  audit:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version-file: .nvmrc }
+      # Blocks on critical. High findings are currently all inside Expo SDK tooling (fix = SDK downgrade),
+      # so they are reported as a warning; revisit on each Expo SDK bump.
+      - run: npm run audit:deps
+      - run: npm audit --omit=dev --audit-level=high || echo "::warning::High-severity advisories in prod deps (see log)"
+
+  secrets:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with: { fetch-depth: 0 }
+      - name: gitleaks
+        run: |
+          curl -sSfL https://github.com/gitleaks/gitleaks/releases/download/v8.18.4/gitleaks_8.18.4_linux_x64.tar.gz | tar xz gitleaks
+          ./gitleaks detect --source . --redact -v

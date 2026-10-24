@@ -1,0 +1,15 @@
+node_modules/
+dist/
+coverage/
+.expo/
+.env
+.env.*
+!.env.example
+*.log
+.DS_Store
+# generated (never edit, never commit: keeps feature branches conflict-free)
+core/feature-registry/registry.generated.ts
+supabase/migrations/
+supabase/.temp/
+ios/
+android/

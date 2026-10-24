@@ -1,0 +1,7 @@
+# Both devs own everything; shared code needs the OTHER dev's review (enforced via branch protection
+# "Require review from Code Owners").
+*            @AHasenbein @rishabobby
+/core/       @AHasenbein @rishabobby
+/contracts/  @AHasenbein @rishabobby
+/.github/    @AHasenbein @rishabobby
+/tests/architecture/  @AHasenbein @rishabobby

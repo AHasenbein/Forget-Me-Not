@@ -1,0 +1,6 @@
+npx lint-staged
+if command -v gitleaks >/dev/null 2>&1; then
+  gitleaks protect --staged --redact -v
+else
+  echo "WARN: gitleaks not installed (brew install gitleaks). CI will still scan." >&2
+fi
