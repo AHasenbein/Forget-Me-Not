@@ -53,7 +53,7 @@ export function findBoundaryViolations(files: SourceFile[]): string[] {
             problems.push(`${f.path}: relative import ${spec} escapes features/${parts[1]}/`);
         }
       }
-      const coreExempt = f.path === 'core/feature-registry/registry.generated.ts';
+      const coreExempt = /^core\/feature-registry\/(ui-)?registry\.generated\.ts$/.test(f.path);
       if (
         (parts[0] === 'core' || parts[0] === 'contracts') &&
         !coreExempt &&

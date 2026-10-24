@@ -11,7 +11,7 @@ Circle members have no access at all. **Not built yet:** video confirmation of p
 ## Public interface
 
 - Routes under `/api/reminders` (patient = P, caregiver = C):
-  `GET /today` (P,C) · `GET /schedules` (P,C) · `POST /schedules` (C) · `PATCH|DELETE /schedules/:id` (C) ·
+  `GET /today` (P,C; returns `{ now, occurrences }`, `now` = server app time) · `GET /history?days=7` (P,C) · `GET /schedules` (P,C) · `POST /schedules` (C) · `PATCH|DELETE /schedules/:id` (C) ·
   `POST /occurrences/:id/confirm` (P,C) · `POST /occurrences/:id/snooze` (P).
 - `index.ts` exports what a job runner / cross-feature tests may use. Status codes come from `HttpError`:
   404 `not_found` (also for another patient's ids), 403 `forbidden`/`not_linked`, 409 `too_early`, `too_soon`,
@@ -44,14 +44,28 @@ Try it: `npm run dev:api:demo`, then call with `Authorization: Bearer demo:careg
 - Emits: `caregiver.alert` (severity `urgent` for pills, `warning` otherwise)
 - Consumes: none
 
+## UI (dashboard widgets, `ui/`)
+
+- **Patient** (`PatientReminders`): ONE card, ONE primary button ("I took it"); snooze is secondary (hidden at the limit);
+  a missed pill says "Your caregiver has been told" with no retry; errors are plain words (`ui/model.ts`).
+- **Caregiver** (`CaregiverReminders`): counts, "needs attention" cards with "I gave it" / "Mark done", today's list,
+  7-day history, schedule list (pause/resume, two-tap delete), add form. Circle members see nothing from this feature.
+- `ui/model.ts` holds the logic (unit-tested); the `.tsx` files are thin.
+
+## The clock
+
+`manifest.jobs` runs `sweep()` (prompt at due, again at +15, caregiver alert at +30). `core/jobs` polls the app clock, so
+speeding up or skipping demo time fires it immediately. Live: the API process runs it; a Supabase cron is the Stage 2 option.
+
 ## Open items / decisions for later
 
-- **Nothing runs `sweep()` yet.** It must be called every minute by a job (Supabase cron / edge function) with
-  server-side time. Don't call it from request handlers, and don't start a timer inside the feature.
-- Video pill confirmation: `Confirmation.method: 'video'` and `verification` states are already modelled; low-confidence
-  results must go to caregiver review (root rules).
-- Patient screen (one huge button) and caregiver schedule editor: need the app shell to render feature screens.
-- Missed-reminder push to the caregiver is delivered by the notifications feature (stand-in in the cross-feature test).
+- **No live store**: `MemoryStore` is demo-only and live mode throws on purpose. Needs an async `ReminderStore`
+  (Supabase), tables `reminders_schedules` / `reminders_occurrences` with RLS, and a real login (verifier is a stub).
+- **No real push**: prompts go to the mock notifier; the patient sees them in the app. `expo-notifications` needs a dev build.
+- Video pill confirmation: `Confirmation.method: 'video'` and `verification` states are modelled; low-confidence results
+  must go to caregiver review (root rules).
+- Patient name is hardcoded as "Margaret" in caregiver copy until a profile exists.
+- Missed-reminder delivery to the caregiver belongs to the notifications feature (stand-in in the cross-feature test).
 
 ## Test checklist (Definition of Done)
 

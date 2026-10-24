@@ -342,3 +342,26 @@ describe('authorization', () => {
     expect(svc.today(caregiver)[0]!.dueAt).toBe('2026-06-02T03:00:00.000Z');
   });
 });
+
+describe('history', () => {
+  it('summarises the last days for the caregiver and is scoped to the patient', async () => {
+    const { svc, caregiver, patient, min, first } = setup();
+    svc.createSchedule(caregiver, pill);
+    svc.createSchedule(caregiver, { ...pill, kind: 'feed_pets' });
+    min(5);
+    svc.confirm(patient, svc.today(patient).find((o) => o.kind === 'pill')!.id);
+    min(ESCALATE_MIN);
+    await svc.sweep();
+    const h = svc.history(caregiver, 7);
+    expect(h.summary).toEqual({ confirmed: 1, missed: 1, skipped: 0 });
+    expect(h.occurrences).toHaveLength(2);
+    expect(first()).toBeDefined();
+    expect(svc.history(createLinkedPair().caregiver, 7).occurrences).toEqual([]);
+  });
+  it('clamps the window and rejects circle members', () => {
+    const { svc, patient } = setup();
+    expect(svc.history(patient, Number.NaN).days).toBe(7);
+    expect(svc.history(patient, 9999).days).toBe(30);
+    expect(() => svc.history(createCircleMember(patient), 7)).toThrow(HttpError);
+  });
+});

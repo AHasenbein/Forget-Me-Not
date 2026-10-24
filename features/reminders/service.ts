@@ -171,6 +171,28 @@ export function createReminderService({ store, bus, notifier, now }: ReminderDep
         .map((o) => view(o, at.getTime()));
     },
 
+    /** Last `days` days (default 7, max 30) with a summary, for the caregiver. */
+    history(user: AuthUser, days: number) {
+      requireRole(user, 'patient', 'primary_caregiver');
+      const n = Number.isInteger(days) ? Math.min(30, Math.max(1, days)) : 7;
+      const at = now().getTime();
+      const items = store
+        .listOccurrences(patientOf(user))
+        .filter((o) => dueMs(o) >= at - n * 86_400_000 && dueMs(o) <= at)
+        .sort((a, b) => b.dueAt.localeCompare(a.dueAt))
+        .map((o) => view(o, at));
+      const count = (p: Phase) => items.filter((o) => o.phase === p).length;
+      return {
+        days: n,
+        summary: {
+          confirmed: count('confirmed'),
+          missed: count('missed') + count('overdue'),
+          skipped: count('skipped'),
+        },
+        occurrences: items,
+      };
+    },
+
     /** One tap. Idempotent: a second tap returns the existing confirmation. */
     confirm(user: AuthUser, id: string) {
       requireRole(user, 'patient', 'primary_caregiver');

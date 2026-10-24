@@ -1,3 +1,4 @@
+import { now as clockNow } from '@core/clock';
 import type { RouteContext } from '@core/feature-registry/manifest';
 import type { AuthUser } from '@core/auth/types';
 import type { CreateScheduleInput, PatchScheduleInput } from './schemas';
@@ -15,6 +16,12 @@ export const deleteSchedule = (c: RouteContext) => {
   getService().deleteSchedule(user(c), c.params.id!);
   return { ok: true };
 };
-export const today = (c: RouteContext) => getService().today(user(c));
+// `now` is the SERVER's app time (it can be sped up in demo): clients must use it, not the device clock.
+export const today = (c: RouteContext) => ({
+  now: clockNow().toISOString(),
+  occurrences: getService().today(user(c)),
+});
+export const history = (c: RouteContext) =>
+  getService().history(user(c), Number(c.query.days ?? 7));
 export const confirm = (c: RouteContext) => getService().confirm(user(c), c.params.id!);
 export const snooze = (c: RouteContext) => getService().snooze(user(c), c.params.id!);

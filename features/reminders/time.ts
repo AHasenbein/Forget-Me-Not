@@ -56,6 +56,12 @@ export function localDateOf(instant: Date, tz: string): string {
   return `${w.y}-${pad(w.m)}-${pad(w.d)}`;
 }
 
+/** `HH:MM` wall-clock time of `instant` in `tz` (used to seed demo reminders relative to now). */
+export function localTimeOf(instant: Date, tz: string): string {
+  const w = wall(instant.getTime(), tz);
+  return `${pad(w.h)}:${pad(w.mi)}`;
+}
+
 /** 0 = Sunday .. 6 = Saturday, for a `YYYY-MM-DD` calendar date. */
 export function weekdayOf(date: string): number {
   const [y, m, d] = date.split('-').map(Number) as [number, number, number];
