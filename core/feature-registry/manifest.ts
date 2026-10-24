@@ -50,6 +50,10 @@ export interface FeatureManifest {
   events: { emits: readonly EventName[]; consumes: readonly EventName[] };
   /** Filenames in features/<name>/migrations/, formatted <name>__<YYYYMMDDHHmm>_<desc>.sql */
   migrations: readonly string[];
+  /** Background work (e.g. the reminders sweep). Run by core/jobs/runner in the server process. */
+  jobs?: readonly { name: string; everyMs: number; run(): void | Promise<void> }[];
+  /** Clears this feature's demo data (settings > Reset demo). Demo mode only. */
+  demoReset?(): void | Promise<void>;
   /**
    * Canned data for demos/dev (REQUIRED for any feature with user-visible data). Seed from the shared
    * `world` so the story is consistent across features. Idempotent. Only ever run in demo mode.

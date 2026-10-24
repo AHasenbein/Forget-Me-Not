@@ -1,28 +1,36 @@
 import type { DemoWorld } from '@core/demo/world';
 import { getService, getStore } from './runtime';
 import type { Schedule } from './schemas';
+import { localTimeOf } from './time';
 
-/** Canned reminders for Margaret (from the shared demo world + a feature-local shower). Idempotent. */
+/**
+ * Canned reminders for Margaret. Times are RELATIVE to demo "now" so the demo is walkable immediately:
+ * pill in 2 min, then +4 min apart. (Fixed clock times would all be "missed" whenever you start.)
+ * `activeFrom = now` so nothing earlier today is generated. Idempotent.
+ */
+export const DEMO_OFFSETS_MIN = [2, 6, 10, 14];
+
 export function seedReminders(world: DemoWorld): void {
   const store = getStore();
   getService(); // make sure the runtime exists
-  const rows: [string, Schedule['kind'], string][] = [
-    ...world.reminders.map((r) => [r.id, r.kind, r.time] as [string, Schedule['kind'], string]),
-    ['demo-rem-shower', 'shower', '19:00'],
+  const kinds: [string, Schedule['kind']][] = [
+    ...world.reminders.map((r) => [r.id, r.kind] as [string, Schedule['kind']]),
+    ['demo-rem-shower', 'shower'],
   ];
-  for (const [id, kind, localTime] of rows) {
-    if (store.getSchedule(`demo-sched-${id}`)) continue;
+  kinds.forEach(([id, kind], i) => {
+    if (store.getSchedule(`demo-sched-${id}`)) return;
+    const due = new Date(world.now.getTime() + (DEMO_OFFSETS_MIN[i] ?? 20) * 60_000);
     store.putSchedule({
       id: `demo-sched-${id}`,
       patientId: world.patient.id,
       kind,
-      localTime,
+      localTime: localTimeOf(due, world.profile.timeZone),
       daysOfWeek: [0, 1, 2, 3, 4, 5, 6],
       timeZone: world.profile.timeZone,
       escalate: true,
       paused: false,
       createdBy: world.caregiver.id,
-      activeFrom: new Date(world.now.getTime() - 24 * 3_600_000).toISOString(), // today's earlier ones show up
+      activeFrom: world.now.toISOString(),
     });
-  }
+  });
 }

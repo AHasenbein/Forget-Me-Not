@@ -22,6 +22,7 @@ export default tseslint.config(
       'coverage',
       '.expo',
       'core/feature-registry/registry.generated.ts',
+      'core/feature-registry/ui-registry.generated.ts',
     ],
   },
   js.configs.recommended,
