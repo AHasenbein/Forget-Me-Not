@@ -1,3 +1,4 @@
+import { now } from '@core/clock';
 import { isDemo } from '@core/config/data-mode';
 import { eventBus } from '@core/events/bus';
 import type { Notifier } from '@core/notifications';
@@ -23,7 +24,7 @@ const notifier = (): Notifier => (providers ??= getProviders()).notifier;
 export function getService(): ReminderService {
   const bus = getBus() ?? eventBus;
   if (!service || builtWith !== bus) {
-    service = createReminderService({ store: getStore(), bus, notifier, now: () => new Date() });
+    service = createReminderService({ store: getStore(), bus, notifier, now });
     builtWith = bus;
   }
   return service;

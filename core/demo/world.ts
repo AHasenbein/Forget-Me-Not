@@ -1,6 +1,7 @@
 import type { GeofenceSpec, LocationReading } from '@contracts/location';
 import type { CheckInSent } from '@contracts/checkin';
 import type { AuthUser } from '../auth/types';
+import { now as appNow } from '../clock';
 import type { BankTransaction } from '../providers/types';
 
 export interface Point {
@@ -46,7 +47,7 @@ export interface DemoWorld {
   news: string[];
 }
 
-export function buildDemoWorld(now: Date = new Date()): DemoWorld {
+export function buildDemoWorld(now: Date = appNow()): DemoWorld {
   const ago = (min: number) => new Date(now.getTime() - min * 60_000).toISOString();
   const home = { lat: 40.7128, lng: -74.006 };
   const park = { lat: 40.7138, lng: -74.0 };

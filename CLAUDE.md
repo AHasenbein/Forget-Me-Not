@@ -53,7 +53,8 @@ features/<name>/   one vertical slice: ui, routes, services, models, migrations/
 features/_template copy source for `npm run new-feature` (not a feature, never imported)
 core/              SHARED: auth, db, config, logging, events (bus), notifications, ai, design-system, testing, server, feature-registry
 contracts/         SHARED: typed interfaces + event schemas (location-read contract, check-in events, EventMap)
-app/               Expo Router shell only. Screens come from features.
+app/               Expo Router shell only (3 one-line files). Real shell code is core/client.
+core/client/       app shell: session (demo personas), API client, dashboards, settings. core/clock = app time, core/jobs = background jobs.
 tests/             architecture/ (boundary, route-auth), smoke/, e2e/, integration/cross-feature/
 ```
 
@@ -67,7 +68,13 @@ tests/             architecture/ (boundary, route-auth), smoke/, e2e/, integrati
 5. Migrations: `features/<name>/migrations/<name>__<YYYYMMDDHHmm>_<desc>.sql`, tables prefixed `<name_>`, RLS on.
    `npm run sync-migrations` assembles `supabase/migrations/` (generated, gitignored).
 6. Env vars: per feature, prefixed `<NAME_UPPER_SNAKE>_`, declared in the manifest, validated at startup, listed in `.env.example`.
-7. Feature flags: `FEATURE_<NAME>=on|off`. New features ship `enabledByDefault: false`; off = no routes, no subscriptions (inert).
+7. **UI without touching shared files**: a feature's screens are dashboard widgets in `features/<name>/ui/index.tsx`
+   (`defineFeatureUi({ widgets: [{ id, role, order, Component }] })`), auto-registered by `gen-registry` (gitignored
+   `ui-registry.generated.ts`). Never import `ui/` from `manifest.ts` (the server must not load React Native). Keep view
+   logic in pure `.ts` (unit-testable) and the `.tsx` thin. Build with `core/design-system/components` only.
+8. **Time and background work**: read time ONLY from `@core/clock` `now()` (services take `now` as a dependency so tests use
+   `FakeClock`). Background work = manifest `jobs` (run by `core/jobs`); never `setInterval` inside a feature or a handler.
+9. Feature flags: `FEATURE_<NAME>=on|off`. New features ship `enabledByDefault: false`; off = no routes, no subscriptions (inert).
 
 ## Demo vs live data (hackathon demo must always work)
 
@@ -86,8 +93,11 @@ tests/             architecture/ (boundary, route-auth), smoke/, e2e/, integrati
   (`demo:patient | demo:caregiver | demo:daughter | demo:friend`) exist only in demo mode, for instant role switching.
 - Canned timestamps are relative to "now" (so "2 minutes ago" is true on stage). Show a small "Demo data" badge on
   caregiver/dev screens (never on patient screens). Never run demo mode against a deployment holding real patient data.
-- Demo shortcuts: `npm run dev:demo` (app) / `dev:api:demo` (API) turn on every feature (`FEATURE_ALL=on`) with canned
-  data; `dev:live` / `dev:api:live` switch to real data.
+- Demo shortcuts: `npm run dev:api:demo` (API on :8787; the app talks to it over HTTP so patient + caregiver tabs share
+  state) and `npm run dev:demo` (app; press `w` for web) turn on every feature with canned data; `dev:*:live` use real data.
+- **Demo clock** (Settings > Demo controls; patient/caregiver only; demo mode only, 404 otherwise): speed 1x-600x, skip
+  ahead, reset. Seed canned data RELATIVE to demo "now" (first reminder due in 2 min), never at fixed clock times.
+  The app shows the server's `now`, not the device clock. Phones: `EXPO_PUBLIC_API_URL=http://<your-LAN-ip>:8787`.
 
 ## Commands
 

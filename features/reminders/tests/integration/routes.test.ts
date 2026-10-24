@@ -106,8 +106,10 @@ describe('reminders routes (authz + wiring)', () => {
       (await t.call(`/schedules/${id}`, t.b.caregiver, 'PATCH', { paused: true })).status,
     ).toBe(404);
     expect((await t.call(`/schedules/${id}`, t.b.caregiver, 'DELETE')).status).toBe(404);
-    const theirs = (await (await t.call('/today', t.b.caregiver)).json()) as unknown[];
-    expect(theirs).toEqual([]);
+    const theirs = (await (await t.call('/today', t.b.caregiver)).json()) as {
+      occurrences: unknown[];
+    };
+    expect(theirs.occurrences).toEqual([]);
   });
 
   it('HttpError statuses reach the client with only a code', async () => {
