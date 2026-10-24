@@ -1,4 +1,5 @@
 import { MemoryStore } from '../../store';
-import { storeContract } from './store-contract';
+import { storeContract, storeContractPillCheck } from './store-contract';
 
 storeContract('MemoryStore', () => new MemoryStore());
+storeContractPillCheck('MemoryStore', () => new MemoryStore());

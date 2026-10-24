@@ -6,7 +6,7 @@ Read the root `CLAUDE.md` first. Stay inside `features/reminders/`.
 
 Daily reminders for the patient: **pill, brush teeth, shower, feed pets**. The primary caregiver sets the
 schedules; the patient confirms with ONE tap. Unconfirmed => the caregiver is alerted (`caregiver.alert`).
-Circle members have no access at all. **Not built yet:** video confirmation of pills (computer vision).
+Circle members have no access at all. Pills also get an optional **photo check** (below).
 
 ## Public interface
 
@@ -54,6 +54,24 @@ Try it: `npm run dev:api:demo`, then call with `Authorization: Bearer demo:careg
   7-day history, schedule list (pause/resume, two-tap delete), add form. Circle members see nothing from this feature.
 - `ui/model.ts` holds the logic (unit-tested); the `.tsx` files are thin.
 
+## Pill photo check
+
+After the patient taps "I took it" on a pill, the app offers to take ~4 photos (`ui/PillCamera.tsx`; demo: "Use sample photos").
+
+- **The tap stays the source of truth.** Photos only set `confirmation.verification`; a failed upload, vision outage or bad model
+  output means `pending_review`, never a missed alert and never a blocked patient. The patient always ends on "Thank you".
+- Result: confident "taken" => `verified` (photos NOT kept). Unclear / low confidence / error => `pending_review`.
+  Confident "not taken" => `rejected`. Either of the last two raises ONE `caregiver.alert` (`pill_check_review`, IDs only).
+- **Privacy**: photos are stored only while a human must review them; deleted when the caregiver approves, or after
+  `FRAME_RETENTION_DAYS` (7) by the `reminders.cleanup-frames` job. Only the caregiver can fetch them (over the API, no public
+  URLs), and every view and review is written to `reminders_audit` (`GET /audit`).
+- **Model output is untrusted**: strict zod schema `{verdict, confidence}` (extra fields rejected), image bytes sniffed (a
+  PNG labelled JPEG, or a script, is refused before any model sees it), at most 5 photos, body size limit before parsing.
+  Text inside photos can never trigger anything: the only effect is a verification label.
+- Demo: Settings > Demo controls > "Pill photo check" picks what the canned check sees (Clear / Unclear / Not taken).
+  Live: `DATA_MODE_VISION=live` + `AI_API_KEY` uses `core/ai/claude-vision.ts` (claude-opus-5-5, structured output).
+- Routes: `POST /occurrences/:id/pill-check` (P), `GET /occurrences/:id/frames` (C), `POST /occurrences/:id/review` (C), `GET /audit` (C).
+
 ## The clock
 
 `manifest.jobs` runs `sweep()` (prompt at due, again at +15, caregiver alert at +30). `core/jobs` polls the app clock, so
@@ -65,8 +83,8 @@ speeding up or skipping demo time fires it immediately. Live: the API process ru
 - Known limit: the "no two pills in 2h" check spans two rows, so two simultaneous confirms of different pills could both
   pass. Closing it needs a Postgres function.
 - **No real push**: prompts go to the mock notifier; the patient sees them in the app. `expo-notifications` needs a dev build.
-- Video pill confirmation: `Confirmation.method: 'video'` and `verification` states are modelled; low-confidence results
-  must go to caregiver review (root rules).
+- The live photo check has not been run against the real model (no `AI_API_KEY` yet): only its request/response handling is
+  tested with a fake client. Camera needs a secure origin: `localhost` works; a phone browser on `http://<LAN-ip>` does not.
 - Patient name is hardcoded as "Margaret" in caregiver copy until a profile exists.
 - Missed-reminder delivery to the caregiver belongs to the notifications feature (stand-in in the cross-feature test).
 

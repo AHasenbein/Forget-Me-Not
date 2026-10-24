@@ -1,5 +1,5 @@
 import type { SupabaseClient } from '@supabase/supabase-js';
-import type { Occurrence, Schedule } from './schemas';
+import type { AuditEntry, Frame, Occurrence, Schedule } from './schemas';
 import type { OccurrenceExpect, ReminderStore } from './store';
 
 /**
@@ -8,6 +8,8 @@ import type { OccurrenceExpect, ReminderStore } from './store';
  */
 const S = 'reminders_schedules';
 const O = 'reminders_occurrences';
+const F = 'reminders_frames';
+const A = 'reminders_audit';
 
 type Row = Record<string, unknown>;
 
@@ -117,9 +119,67 @@ export class SupabaseStore implements ReminderStore {
     if (expect.status) q = q.in('status', [...expect.status]);
     if (expect.nudges !== undefined) q = q.eq('nudges', expect.nudges);
     if (expect.snoozeCount !== undefined) q = q.eq('snooze_count', expect.snoozeCount);
+    if (expect.verification) q = q.in('confirmation->>verification', [...expect.verification]);
     const rows = rowsOf(await q.select('*'));
     return rows[0] ? occurrenceFromRow(rows[0]) : null;
   };
 
   deleteOccurrence = async (id: string) => void check(await this.db.from(O).delete().eq('id', id));
+
+  putFrames = async (frames: Frame[]) =>
+    void check(
+      await this.db.from(F).insert(
+        frames.map((f) => ({
+          id: f.id,
+          occurrence_id: f.occurrenceId,
+          patient_id: f.patientId,
+          media_type: f.mediaType,
+          data: f.data,
+          created_at: f.createdAt,
+        })),
+      ),
+    );
+  getFrames = async (occurrenceId: string) =>
+    rowsOf(
+      await this.db.from(F).select('*').eq('occurrence_id', occurrenceId).order('created_at'),
+    ).map((r): Frame => ({
+      id: r.id as string,
+      occurrenceId: r.occurrence_id as string,
+      patientId: r.patient_id as string,
+      mediaType: r.media_type as Frame['mediaType'],
+      data: r.data as string,
+      createdAt: new Date(r.created_at as string).toISOString(),
+    }));
+  deleteFrames = async (occurrenceId: string) =>
+    void check(await this.db.from(F).delete().eq('occurrence_id', occurrenceId));
+  deleteFramesOlderThan = async (iso: string) =>
+    rowsOf(await this.db.from(F).delete().lt('created_at', iso).select('id')).length;
+
+  addAudit = async (e: AuditEntry) =>
+    void check(
+      await this.db.from(A).insert({
+        id: e.id,
+        at: e.at,
+        actor_id: e.actorId,
+        patient_id: e.patientId,
+        action: e.action,
+        occurrence_id: e.occurrenceId,
+      }),
+    );
+  listAudit = async (patientId: string, limit: number) =>
+    rowsOf(
+      await this.db
+        .from(A)
+        .select('*')
+        .eq('patient_id', patientId)
+        .order('at', { ascending: false })
+        .limit(limit),
+    ).map((r): AuditEntry => ({
+      id: r.id as string,
+      at: new Date(r.at as string).toISOString(),
+      actorId: r.actor_id as string,
+      patientId: r.patient_id as string,
+      action: r.action as AuditEntry['action'],
+      occurrenceId: r.occurrence_id as string,
+    }));
 }

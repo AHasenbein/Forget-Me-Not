@@ -21,11 +21,12 @@ export function getStore(): ReminderStore {
 }
 
 const notifier = (): Notifier => (providers ??= getProviders()).notifier;
+const vision = () => (providers ??= getProviders()).vision;
 
 export function getService(): ReminderService {
   const bus = getBus() ?? eventBus;
   if (!service || builtWith !== bus) {
-    service = createReminderService({ store: getStore(), bus, notifier, now });
+    service = createReminderService({ store: getStore(), bus, notifier, vision, now });
     builtWith = bus;
   }
   return service;

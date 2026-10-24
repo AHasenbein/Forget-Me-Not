@@ -112,6 +112,43 @@ describe('feature flags + server', () => {
     expect(res.status).toBe(409);
     expect(await res.json()).toEqual({ error: 'snooze_limit' });
   });
+  it('rejects oversized bodies with 413 before parsing, and honours a per-route limit', async () => {
+    const m = defineFeature({
+      ...demo,
+      routes: [
+        {
+          method: 'POST',
+          path: '/small',
+          access: { roles: ['patient'] },
+          input: z.object({ s: z.string() }),
+          handler: () => ({ ok: 1 }),
+        },
+        {
+          method: 'POST',
+          path: '/big',
+          access: { roles: ['patient'] },
+          maxBodyBytes: 200_000,
+          input: z.object({ s: z.string() }),
+          handler: () => ({ ok: 1 }),
+        },
+      ],
+    });
+    const app = createApp({
+      manifests: [m],
+      verifier: fakeVerifier([patient]),
+      env: { FEATURE_DEMO_X: 'on' },
+    });
+    const post = (path: string, s: string) =>
+      app.request(`/api/demo-x${path}`, {
+        method: 'POST',
+        headers: { ...bearer(patient), 'content-type': 'application/json' },
+        body: JSON.stringify({ s }),
+      });
+    const payload = 'x'.repeat(100_000); // > 64 KB default, < 200 KB
+    expect((await post('/small', payload)).status).toBe(413);
+    expect((await post('/big', payload)).status).toBe(200);
+    expect((await post('/big', 'x'.repeat(250_000))).status).toBe(413);
+  });
   it('validates input and hides internal errors', async () => {
     const app = mk({ FEATURE_DEMO_X: 'on' });
     const h = { ...bearer(patient), 'content-type': 'application/json' };
