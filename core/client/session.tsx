@@ -11,7 +11,8 @@ import {
 import type { Role } from '@contracts/circle';
 import { TextScaleContext } from '../design-system/text-scale';
 import { isDemo } from '../config/data-mode';
-import { apiCall, type ApiFn } from './api';
+import { apiCall, ApiError, type ApiFn } from './api';
+import { authClient } from './supabase';
 
 /** Demo personas map to the demo tokens the API accepts in demo mode. */
 export const PERSONAS = [
@@ -28,12 +29,20 @@ export const TEXT_SIZES = [
   { label: 'Extra large', scale: 1.5 },
 ] as const;
 
+/** Live mode: where we are in signing in. */
+export type LiveStatus = 'loading' | 'signed_out' | 'no_access' | 'ready';
+
 interface Session {
   demo: boolean;
   persona: Persona;
-  role: Role;
+  /** Null in live mode until we know who you are. */
+  role: Role | null;
   token: string | null;
+  liveStatus: LiveStatus;
+  email: string | null;
   setPersona(p: Persona): void;
+  signIn(email: string, password: string): Promise<string | null>;
+  signOut(): Promise<void>;
   textScale: number;
   setTextScale(s: number): void;
   api: ApiFn;
@@ -54,6 +63,9 @@ export function SessionProvider({ children }: { children: ReactNode }) {
   const demo = useMemo(() => isDemo(), []);
   const [persona, setPersonaState] = useState<Persona>('caregiver');
   const [textScale, setScaleState] = useState(1);
+  const [liveToken, setLiveToken] = useState<string | null | undefined>(undefined); // undefined = not loaded yet
+  const [email, setEmail] = useState<string | null>(null);
+  const [liveRole, setLiveRole] = useState<Role | null | undefined>(undefined); // undefined = unknown, null = no access
 
   useEffect(() => {
     void load('fmn.persona').then(
@@ -64,6 +76,36 @@ export function SessionProvider({ children }: { children: ReactNode }) {
     );
   }, []);
 
+  // Live: follow the Supabase session (it restores from storage and refreshes tokens by itself).
+  useEffect(() => {
+    if (demo) return;
+    const auth = authClient().auth;
+    void auth.getSession().then(({ data }) => {
+      setLiveToken(data.session?.access_token ?? null);
+      setEmail(data.session?.user.email ?? null);
+    });
+    const { data } = auth.onAuthStateChange((_event, s) => {
+      setLiveToken(s?.access_token ?? null);
+      setEmail(s?.user.email ?? null);
+    });
+    return () => data.subscription.unsubscribe();
+  }, [demo]);
+
+  // Live: ask the API who we are. A valid login with no profile is "no access", not an error screen.
+  useEffect(() => {
+    if (demo || !liveToken) return setLiveRole(liveToken === null ? null : undefined);
+    let alive = true;
+    setLiveRole(undefined);
+    apiCall<{ role: Role }>(liveToken, 'GET', '/api/me')
+      .then((me) => alive && setLiveRole(me.role))
+      .catch(
+        (e) => alive && setLiveRole(e instanceof ApiError && e.status === 401 ? null : undefined),
+      );
+    return () => {
+      alive = false;
+    };
+  }, [demo, liveToken]);
+
   const setPersona = useCallback((p: Persona) => {
     setPersonaState(p);
     save('fmn.persona', p);
@@ -73,16 +115,61 @@ export function SessionProvider({ children }: { children: ReactNode }) {
     save('fmn.textScale', String(v));
   }, []);
 
-  // Live sign-in (Supabase) arrives in Stage 2: until then live mode has no token.
-  const token = demo ? `demo:${persona}` : null;
-  const role = PERSONAS.find((p) => p.id === persona)!.role;
+  const token = demo ? `demo:${persona}` : (liveToken ?? null);
+  const role = demo ? PERSONAS.find((p) => p.id === persona)!.role : (liveRole ?? null);
+  const liveStatus: LiveStatus = demo
+    ? 'ready'
+    : liveToken === undefined
+      ? 'loading'
+      : liveToken === null
+        ? 'signed_out'
+        : liveRole === undefined
+          ? 'loading'
+          : liveRole === null
+            ? 'no_access'
+            : 'ready';
+
+  const signIn = useCallback(async (e: string, password: string) => {
+    const { error } = await authClient().auth.signInWithPassword({ email: e.trim(), password });
+    return error ? 'That email or password isn’t right.' : null; // same message either way: no account hints
+  }, []);
+  const signOut = useCallback(async () => {
+    await authClient().auth.signOut();
+  }, []);
+
   const api = useCallback<ApiFn>(
     (method, path, body) => apiCall(token, method, path, body),
     [token],
   );
   const value = useMemo(
-    () => ({ demo, persona, role, token, setPersona, textScale, setTextScale, api }),
-    [demo, persona, role, token, setPersona, textScale, setTextScale, api],
+    () => ({
+      demo,
+      persona,
+      role,
+      token,
+      liveStatus,
+      email,
+      setPersona,
+      signIn,
+      signOut,
+      textScale,
+      setTextScale,
+      api,
+    }),
+    [
+      demo,
+      persona,
+      role,
+      token,
+      liveStatus,
+      email,
+      setPersona,
+      signIn,
+      signOut,
+      textScale,
+      setTextScale,
+      api,
+    ],
   );
   return (
     <Ctx.Provider value={value}>

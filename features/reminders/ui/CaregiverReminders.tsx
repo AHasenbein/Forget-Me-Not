@@ -32,10 +32,10 @@ interface History {
 }
 
 export function CaregiverReminders() {
-  const { api, persona } = useSession();
-  const today = usePoll(() => api<TodayResponse>('GET', `${BASE}/today`), 2000, [persona]);
-  const schedules = usePoll(() => api<Schedule[]>('GET', `${BASE}/schedules`), 4000, [persona]);
-  const history = usePoll(() => api<History>('GET', `${BASE}/history?days=7`), 8000, [persona]);
+  const { api, token } = useSession();
+  const today = usePoll(() => api<TodayResponse>('GET', `${BASE}/today`), 2000, [token]);
+  const schedules = usePoll(() => api<Schedule[]>('GET', `${BASE}/schedules`), 4000, [token]);
+  const history = usePoll(() => api<History>('GET', `${BASE}/history?days=7`), 8000, [token]);
   const [problem, setProblem] = useState('');
   const [busyId, setBusyId] = useState<string | null>(null);
   const [kind, setKind] = useState<ReminderKind>('pill');

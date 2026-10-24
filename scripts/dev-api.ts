@@ -1,18 +1,22 @@
 import { serve } from '@hono/node-server';
 import { Hono } from 'hono';
 import { cors } from 'hono/cors';
+import { createVerifier, supabaseAuthPorts } from '../core/auth/supabase-verifier';
 import { isDemo } from '../core/config/data-mode';
+import { serviceClient } from '../core/db';
 import { buildDemoWorld, createDemoControls, seedDemo } from '../core/demo';
 import { loadEnv } from '../core/config/env';
 import { discoverManifests, isEnabled } from '../core/feature-registry/discover';
 import { startJobs } from '../core/jobs/runner';
-import { getProviders } from '../core/providers';
+import { getProviders, registerLive } from '../core/providers';
 import { createApp } from '../core/server/app';
 
 const manifests = await discoverManifests();
 loadEnv(manifests.filter((m) => isEnabled(m))); // fails fast on bad env
 const world = buildDemoWorld();
-// live mode: Stage 2 registers the Supabase verifier etc. via registerLive(); until then getProviders throws.
+// Live: real tokens are checked with Supabase Auth, then role/patient come from our `profiles` table.
+// AI/Plaid/notifier/location stay on their demo adapters until their live ones exist (DATA_MODE_<SERVICE>=demo).
+if (!isDemo()) registerLive('verifier', createVerifier(supabaseAuthPorts(serviceClient())));
 const { verifier } = getProviders({ world });
 
 const root = new Hono();
@@ -25,6 +29,13 @@ if (demo) {
     'DEMO MODE: canned data, tokens demo:patient | demo:caregiver | demo:daughter | demo:friend',
   );
   console.log('seeded:', await seedDemo(manifests, { world }));
+}
+if (!demo) {
+  // Live: only the web app's origin(s) may call the API from a browser. Native apps are not subject to CORS.
+  const origins = (process.env.CORS_ORIGINS ?? 'http://localhost:8081')
+    .split(',')
+    .map((o) => o.trim());
+  root.use('*', cors({ origin: origins, allowHeaders: ['Authorization', 'Content-Type'] }));
 }
 root.route('/', createApp({ manifests, verifier }));
 

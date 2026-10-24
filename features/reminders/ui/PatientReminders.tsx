@@ -14,9 +14,9 @@ const Emoji = ({ children }: { children: string }) => (
 
 /** Patient view: ONE card, ONE primary button. Plain words, no codes. */
 export function PatientReminders() {
-  const { api, persona } = useSession();
+  const { api, token } = useSession();
   const { data, error, reload } = usePoll(() => api<TodayResponse>('GET', `${BASE}/today`), 2000, [
-    persona,
+    token,
   ]);
   const [busy, setBusy] = useState(false);
   const [problem, setProblem] = useState('');
