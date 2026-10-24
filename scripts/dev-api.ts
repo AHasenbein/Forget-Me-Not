@@ -1,8 +1,10 @@
 import { serve } from '@hono/node-server';
 import { Hono } from 'hono';
 import { cors } from 'hono/cors';
+import Anthropic from '@anthropic-ai/sdk';
+import { createClaudeVision } from '../core/ai/claude-vision';
 import { createVerifier, supabaseAuthPorts } from '../core/auth/supabase-verifier';
-import { isDemo } from '../core/config/data-mode';
+import { dataMode, isDemo } from '../core/config/data-mode';
 import { serviceClient } from '../core/db';
 import { buildDemoWorld, createDemoControls, seedDemo } from '../core/demo';
 import { loadEnv } from '../core/config/env';
@@ -17,6 +19,11 @@ const world = buildDemoWorld();
 // Live: real tokens are checked with Supabase Auth, then role/patient come from our `profiles` table.
 // AI/Plaid/notifier/location stay on their demo adapters until their live ones exist (DATA_MODE_<SERVICE>=demo).
 if (!isDemo()) registerLive('verifier', createVerifier(supabaseAuthPorts(serviceClient())));
+// Real photo checks only when asked for (DATA_MODE_VISION=live) AND a key exists; otherwise the canned check.
+if (dataMode('vision') === 'live') {
+  if (!process.env.AI_API_KEY) throw new Error('DATA_MODE_VISION=live needs AI_API_KEY in .env');
+  registerLive('vision', createClaudeVision(new Anthropic({ apiKey: process.env.AI_API_KEY })));
+}
 const { verifier } = getProviders({ world });
 
 const root = new Hono();

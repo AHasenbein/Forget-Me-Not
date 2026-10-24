@@ -27,6 +27,8 @@ export interface RouteDef {
   /** Relative to /api/<feature-name>. Example: '/checkins/:id' */
   path: string;
   access: RouteAccess;
+  /** Max request body in bytes (default 64 KB). Routes that take uploads (photos) must raise it explicitly. */
+  maxBodyBytes?: number;
   /** Zod schema for the JSON body. Required for POST/PUT/PATCH on non-public routes. */
   input?: z.ZodType;
   handler(ctx: RouteContext): unknown | Promise<unknown>;

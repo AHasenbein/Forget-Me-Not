@@ -156,6 +156,10 @@ const JUMPS: [string, number][] = [
   ['+2 hours', 120],
 ];
 
+interface Vision {
+  outcome: string;
+  options: string[];
+}
 interface Clock {
   now: string;
   speed: number;
@@ -164,6 +168,11 @@ interface Clock {
 function DemoTools() {
   const { api } = useSession();
   const { data: clock, error, reload } = usePoll(() => api<Clock>('GET', '/demo/clock'), 2000, []);
+  const { data: vision, reload: reloadVision } = usePoll(
+    () => api<Vision>('GET', '/demo/vision'),
+    4000,
+    [],
+  );
   const [busy, setBusy] = useState(false);
   const [note, setNote] = useState('');
   const act = async (label: string, method: string, path: string, body?: unknown) => {
@@ -214,6 +223,22 @@ function DemoTools() {
             key={label}
             label={label}
             onPress={() => void act(`Skipped ${label}`, 'POST', '/demo/clock/jump', { minutes })}
+          />
+        ))}
+      </Row>
+      <AppText variant="small" tone="muted">
+        Pill photo check: what the next check will “see”
+      </AppText>
+      <Row gap={8}>
+        {(vision?.options ?? []).map((o) => (
+          <Chip
+            key={o}
+            label={{ clear: 'Clear', unclear: 'Unclear', not_taken: 'Not taken' }[o] ?? o}
+            selected={vision?.outcome === o}
+            onPress={() => {
+              void act(`Next check: ${o}`, 'POST', '/demo/vision', { outcome: o });
+              reloadVision();
+            }}
           />
         ))}
       </Row>

@@ -1,7 +1,13 @@
 import { now as clockNow } from '@core/clock';
 import type { RouteContext } from '@core/feature-registry/manifest';
 import type { AuthUser } from '@core/auth/types';
-import type { CreateScheduleInput, PatchScheduleInput } from './schemas';
+import type {
+  CreateScheduleInput,
+  PatchScheduleInput,
+  pillCheckInput,
+  reviewInput,
+} from './schemas';
+import type { z } from 'zod';
 import { getService } from './runtime';
 
 // access (in the manifest) guarantees a user on every route here; services re-check role + patient scope.
@@ -25,3 +31,16 @@ export const history = (c: RouteContext) =>
   getService().history(user(c), Number(c.query.days ?? 7));
 export const confirm = (c: RouteContext) => getService().confirm(user(c), c.params.id!);
 export const snooze = (c: RouteContext) => getService().snooze(user(c), c.params.id!);
+
+export const pillCheck = async (c: RouteContext) => {
+  await getService().submitPillCheck(
+    user(c),
+    c.params.id!,
+    (c.body as z.infer<typeof pillCheckInput>).frames,
+  );
+  return { ok: true };
+};
+export const frames = (c: RouteContext) => getService().getFrames(user(c), c.params.id!);
+export const review = (c: RouteContext) =>
+  getService().reviewCheck(user(c), c.params.id!, (c.body as z.infer<typeof reviewInput>).decision);
+export const audit = (c: RouteContext) => getService().audit(user(c));

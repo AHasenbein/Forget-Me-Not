@@ -1,13 +1,18 @@
+import { LOW_CONFIDENCE } from '@core/ai/client';
+import { sniffFrameType, type VisionClient, type VisionFrame } from '@core/ai/vision';
 import type { AuthUser } from '@core/auth/types';
 import type { EventBus } from '@core/events/bus';
 import type { Notifier } from '@core/notifications';
+import { logger } from '@core/logging/logger';
 import { HttpError } from '@core/server/errors';
 import type {
   CreateScheduleInput,
+  Frame,
   Occurrence,
   PatchScheduleInput,
   ReminderKind,
   Schedule,
+  Verification,
 } from './schemas';
 import type { ReminderStore } from './store';
 import { localDateOf, localTimeToUtc, weekdayOf } from './time';
@@ -21,6 +26,8 @@ export const EARLY_WINDOW_MIN = 60;
 /** Two pills can never be confirmed closer than this (double-dose guard; covers travel/DST/edits). */
 export const PILL_MIN_GAP_MIN = 120;
 export const MAX_SCHEDULES = 20;
+/** Photos are kept only for review, and never longer than this. */
+export const FRAME_RETENTION_DAYS = 7;
 
 const MIN = 60_000;
 const PLAIN: Record<ReminderKind, string> = {
@@ -34,6 +41,7 @@ export interface ReminderDeps {
   store: ReminderStore;
   bus: EventBus;
   notifier: () => Notifier; // lazy: only sweeps need it
+  vision: () => VisionClient; // lazy: only the pill check needs it
   now: () => Date;
 }
 
@@ -45,7 +53,7 @@ const escalateMs = (o: Occurrence) => dueMs(o) + (ESCALATE_MIN + o.snoozeCount *
 const effectiveMs = (o: Occurrence) =>
   Math.max(dueMs(o), o.snoozedUntil ? Date.parse(o.snoozedUntil) : 0);
 
-export function createReminderService({ store, bus, notifier, now }: ReminderDeps) {
+export function createReminderService({ store, bus, notifier, vision, now }: ReminderDeps) {
   const patientOf = (user: AuthUser): string => {
     if (!user.patientId) throw new HttpError(403, 'not_linked');
     return user.patientId;
@@ -249,6 +257,127 @@ export function createReminderService({ store, bus, notifier, now }: ReminderDep
       );
       if (!updated) throw new HttpError(409, 'changed');
       return view(updated, at);
+    },
+
+    // ---- pill check (photos) ---------------------------------------------------------------
+    /**
+     * Patient sends a few photos AFTER tapping "I took it". The tap stays the source of truth: this only sets
+     * a verification label, and any failure (bad model output, outage) means "needs caregiver review", never
+     * a missed alert and never a blocked patient. The patient always gets the same answer (no "rejected").
+     */
+    async submitPillCheck(user: AuthUser, id: string, frames: VisionFrame[]) {
+      requireRole(user, 'patient');
+      const o = await ownOccurrence(user, id);
+      if (o.kind !== 'pill') throw new HttpError(409, 'not_a_pill');
+      if (o.status !== 'confirmed' || !o.confirmation) throw new HttpError(409, 'not_confirmed');
+      if (o.confirmation.method === 'caregiver') throw new HttpError(409, 'not_applicable');
+      if (o.confirmation.verification !== 'unverified') throw new HttpError(409, 'already_checked');
+      // The declared type can lie: check the real bytes of every frame.
+      for (const f of frames)
+        if (sniffFrameType(f.data) !== f.mediaType) throw new HttpError(400, 'bad_image');
+
+      let verification: Verification;
+      try {
+        const r = await vision().assessPillTaken(frames);
+        verification =
+          r.confidence < LOW_CONFIDENCE
+            ? 'pending_review'
+            : r.verdict === 'taken'
+              ? 'verified'
+              : r.verdict === 'not_taken'
+                ? 'rejected'
+                : 'pending_review';
+      } catch (err) {
+        logger.error('pill check failed', { occurrence: o.id, err: String(err) }); // no frames/PII in logs
+        verification = 'pending_review';
+      }
+
+      const updated = await store.updateOccurrenceIf(
+        o.id,
+        { status: ['confirmed'], verification: ['unverified'] }, // only the first submission counts
+        { confirmation: { ...o.confirmation, method: 'video', verification } },
+      );
+      if (!updated) throw new HttpError(409, 'already_checked');
+      if (verification !== 'verified') {
+        // Photos are kept ONLY when a human has to look at them.
+        const createdAt = iso(now().getTime());
+        await store.putFrames(
+          frames.map((f, i): Frame => ({
+            id: `${o.id}#${i}`,
+            occurrenceId: o.id,
+            patientId: o.patientId,
+            mediaType: f.mediaType,
+            data: f.data,
+            createdAt,
+          })),
+        );
+        await bus.emit('caregiver.alert', {
+          patientId: o.patientId,
+          source: 'reminders',
+          severity: 'warning',
+          reasonCode: 'pill_check_review',
+        });
+      }
+      return { received: true }; // identical for every outcome
+    },
+
+    /** Caregiver looks at the photos. Every view is written to the audit log. */
+    async getFrames(user: AuthUser, id: string) {
+      requireRole(user, 'primary_caregiver');
+      const o = await ownOccurrence(user, id);
+      const frames = await store.getFrames(o.id);
+      if (!frames.length) throw new HttpError(404, 'no_frames');
+      await store.addAudit({
+        id: crypto.randomUUID(),
+        at: iso(now().getTime()),
+        actorId: user.id,
+        patientId: o.patientId,
+        action: 'pill_frames_viewed',
+        occurrenceId: o.id,
+      });
+      // Served only to the authenticated caregiver through the API: there is no public URL to leak.
+      return { frames: frames.map((f) => ({ mediaType: f.mediaType, data: f.data })) };
+    },
+
+    async reviewCheck(user: AuthUser, id: string, decision: 'approve' | 'reject') {
+      requireRole(user, 'primary_caregiver');
+      const o = await ownOccurrence(user, id);
+      const at = now().getTime();
+      if (!o.confirmation) throw new HttpError(409, 'not_confirmed');
+      const next: Verification = decision === 'approve' ? 'verified' : 'rejected';
+      const updated = await store.updateOccurrenceIf(
+        o.id,
+        { status: ['confirmed'], verification: ['pending_review', 'rejected'] },
+        {
+          confirmation: {
+            ...o.confirmation,
+            verification: next,
+            reviewedBy: user.id,
+            reviewedAt: iso(at),
+          },
+        },
+      );
+      if (!updated) throw new HttpError(409, 'nothing_to_review');
+      if (decision === 'approve') await store.deleteFrames(o.id); // reviewed and fine: don't keep the photos
+      await store.addAudit({
+        id: crypto.randomUUID(),
+        at: iso(at),
+        actorId: user.id,
+        patientId: o.patientId,
+        action: 'pill_check_reviewed',
+        occurrenceId: o.id,
+      });
+      return view(updated, at);
+    },
+
+    async audit(user: AuthUser) {
+      requireRole(user, 'primary_caregiver');
+      return store.listAudit(patientOf(user), 50);
+    },
+
+    /** Job: delete photos past the retention window. Returns how many were removed. */
+    async cleanupFrames(): Promise<number> {
+      return store.deleteFramesOlderThan(iso(now().getTime() - FRAME_RETENTION_DAYS * 86_400_000));
     },
 
     /**

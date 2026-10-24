@@ -7,6 +7,8 @@ import { HttpError } from './errors';
 import { isEnabled } from '../feature-registry/flags';
 import type { FeatureManifest } from '../feature-registry/manifest';
 
+const DEFAULT_MAX_BODY_BYTES = 64 * 1024;
+
 export interface AppDeps {
   manifests: readonly FeatureManifest[];
   verifier: TokenVerifier;
@@ -53,7 +55,21 @@ export function createApp({
         }
         let body: unknown = undefined;
         if (r.input) {
-          const parsed = r.input.safeParse(await c.req.json().catch(() => undefined));
+          // Size is enforced BEFORE parsing. (A chunked body without a length is still read in full, then
+          // rejected; put a reverse proxy limit in front for hostile traffic.)
+          const max = r.maxBodyBytes ?? DEFAULT_MAX_BODY_BYTES;
+          if (Number(c.req.header('content-length') ?? 0) > max)
+            return c.json({ error: 'too_large' }, 413);
+          const text = await c.req.text().catch(() => '');
+          if (new TextEncoder().encode(text).length > max)
+            return c.json({ error: 'too_large' }, 413);
+          let json: unknown;
+          try {
+            json = text ? JSON.parse(text) : undefined;
+          } catch {
+            json = undefined;
+          }
+          const parsed = r.input.safeParse(json);
           if (!parsed.success) return c.json({ error: 'invalid_input' }, 400);
           body = parsed.data;
         }

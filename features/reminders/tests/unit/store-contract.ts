@@ -100,3 +100,103 @@ export function storeContract(name: string, make: () => Promise<ReminderStore> |
     });
   });
 }
+
+/** Frames + audit + the verification expectation (added with the pill check). */
+export function storeContractPillCheck(
+  name: string,
+  make: () => Promise<ReminderStore> | ReminderStore,
+) {
+  const frame = (id: string, createdAt: string, occ = 'ct-pc1') => ({
+    id,
+    occurrenceId: occ,
+    patientId: 'ct-p1',
+    mediaType: 'image/png' as const,
+    data: 'iVBORw0KGgo=',
+    createdAt,
+  });
+  describe(`ReminderStore pill-check contract: ${name}`, () => {
+    it('stores frames per occurrence, deletes one occurrence, and deletes by age', async () => {
+      const store = await make();
+      await store.putFrames([
+        frame('ct-f1', '2026-01-01T00:00:00.000Z'),
+        frame('ct-f2', '2026-06-01T00:00:00.000Z'),
+      ]);
+      await store.putFrames([frame('ct-f3', '2026-06-01T00:00:00.000Z', 'ct-pc2')]);
+      expect((await store.getFrames('ct-pc1')).map((f) => f.id)).toEqual(['ct-f1', 'ct-f2']);
+      expect(await store.deleteFramesOlderThan('2026-03-01T00:00:00.000Z')).toBe(1);
+      expect((await store.getFrames('ct-pc1')).map((f) => f.id)).toEqual(['ct-f2']);
+      await store.deleteFrames('ct-pc2');
+      expect(await store.getFrames('ct-pc2')).toEqual([]);
+    });
+
+    it('lists audit entries newest first, scoped to the patient, with a limit', async () => {
+      const store = await make();
+      const e = (id: string, at: string, patientId = 'ct-p1') => ({
+        id,
+        at,
+        actorId: 'c1',
+        patientId,
+        action: 'pill_frames_viewed' as const,
+        occurrenceId: 'ct-pc1',
+      });
+      await store.addAudit(e('ct-a1', '2026-06-01T10:00:00.000Z'));
+      await store.addAudit(e('ct-a2', '2026-06-01T11:00:00.000Z'));
+      await store.addAudit(e('ct-a3', '2026-06-01T12:00:00.000Z', 'ct-p2'));
+      expect((await store.listAudit('ct-p1', 10)).map((a) => a.id)).toEqual(['ct-a2', 'ct-a1']);
+      expect(await store.listAudit('ct-p1', 1)).toHaveLength(1);
+    });
+
+    it('updateOccurrenceIf honours the verification expectation', async () => {
+      const store = await make();
+      await store.insertOccurrenceIfAbsent({
+        id: 'ct-pc3',
+        scheduleId: 's',
+        patientId: 'ct-p1',
+        kind: 'pill',
+        localDate: '2026-06-01',
+        timeZone: 'UTC',
+        dueAt: '2026-06-01T12:00:00.000Z',
+        status: 'confirmed',
+        snoozeCount: 0,
+        snoozedUntil: null,
+        nudges: 0,
+        missedAt: null,
+        confirmation: {
+          at: '2026-06-01T12:01:00.000Z',
+          by: 'u',
+          method: 'tap',
+          verification: 'unverified',
+        },
+      });
+      const conf = (v: 'verified' | 'rejected') => ({
+        confirmation: {
+          at: '2026-06-01T12:01:00.000Z',
+          by: 'u',
+          method: 'video' as const,
+          verification: v,
+        },
+      });
+      expect(
+        await store.updateOccurrenceIf(
+          'ct-pc3',
+          { verification: ['pending_review'] },
+          conf('verified'),
+        ),
+      ).toBeNull();
+      expect(
+        (
+          await store.updateOccurrenceIf(
+            'ct-pc3',
+            { verification: ['unverified'] },
+            conf('verified'),
+          )
+        )?.confirmation?.verification,
+      ).toBe('verified');
+      const raced = await Promise.all([
+        store.updateOccurrenceIf('ct-pc3', { verification: ['verified'] }, conf('rejected')),
+        store.updateOccurrenceIf('ct-pc3', { verification: ['verified'] }, conf('rejected')),
+      ]);
+      expect(raced.filter(Boolean)).toHaveLength(1);
+    });
+  });
+}
