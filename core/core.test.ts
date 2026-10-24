@@ -7,6 +7,7 @@ import { defineFeature } from './feature-registry/manifest';
 import { redact } from './logging/logger';
 import { isForbiddenForCircle, hasCirclePermission } from './auth/permissions';
 import { createApp } from './server/app';
+import { HttpError } from './server/errors';
 import {
   FakeClock,
   localParts,
@@ -77,6 +78,29 @@ describe('feature flags + server', () => {
     });
     expect((await app.request('/api/demo-x/loc', { headers: bearer(member) })).status).toBe(403);
     expect((await app.request('/api/demo-x/loc', { headers: bearer(granted) })).status).toBe(200);
+  });
+  it('maps HttpError to its status and code (and nothing else)', async () => {
+    const m = defineFeature({
+      ...demo,
+      routes: [
+        {
+          method: 'GET',
+          path: '/nope',
+          access: { roles: ['patient'] },
+          handler: () => {
+            throw new HttpError(409, 'snooze_limit');
+          },
+        },
+      ],
+    });
+    const app = createApp({
+      manifests: [m],
+      verifier: fakeVerifier([patient]),
+      env: { FEATURE_DEMO_X: 'on' },
+    });
+    const res = await app.request('/api/demo-x/nope', { headers: bearer(patient) });
+    expect(res.status).toBe(409);
+    expect(await res.json()).toEqual({ error: 'snooze_limit' });
   });
   it('validates input and hides internal errors', async () => {
     const app = mk({ FEATURE_DEMO_X: 'on' });

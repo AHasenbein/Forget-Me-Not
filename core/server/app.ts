@@ -3,6 +3,7 @@ import { logger } from '../logging/logger';
 import type { TokenVerifier } from '../auth/types';
 import { hasCirclePermission, hasRole } from '../auth/permissions';
 import { EventBus } from '../events/bus';
+import { HttpError } from './errors';
 import { isEnabled } from '../feature-registry/flags';
 import type { FeatureManifest } from '../feature-registry/manifest';
 
@@ -58,6 +59,7 @@ export function createApp({
           });
           return c.json(result ?? { ok: true });
         } catch (err) {
+          if (err instanceof HttpError) return c.json({ error: err.code }, err.status);
           logger.error('route failed', { feature: m.name, route: path, err: String(err) });
           return c.json({ error: 'internal' }, 500); // never leak internals
         }
