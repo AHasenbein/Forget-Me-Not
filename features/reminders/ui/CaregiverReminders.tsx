@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Image, View } from 'react-native';
+import { Image, StyleSheet, View } from 'react-native';
 import { ApiError } from '@core/client/api';
 import { daysLabel, formatTime } from '@core/client/format';
 import { usePoll } from '@core/client/hooks';
@@ -11,8 +11,11 @@ import {
   Card,
   Chip,
   Field,
+  IconCircle,
   Row,
+  Segmented,
   Stack,
+  StatTile,
 } from '@core/design-system/components';
 import type { ReminderKind, Schedule } from '../schemas';
 import { REMINDER_KINDS } from '../schemas';
@@ -21,6 +24,7 @@ import {
   caregiverError,
   caregiverRows,
   type CaregiverRow,
+  dateLabelFor,
   KIND,
   normalizeTime,
   type OccurrenceView,
@@ -46,6 +50,7 @@ export function CaregiverReminders() {
   const [kind, setKind] = useState<ReminderKind>('pill');
   const [time, setTime] = useState('');
   const [confirmDelete, setConfirmDelete] = useState<string | null>(null);
+  const [section, setSection] = useState<Section>('today');
   const [photos, setPhotos] = useState<Record<string, PhotoSet>>({});
 
   const refresh = () => {
@@ -97,29 +102,49 @@ export function CaregiverReminders() {
     });
   };
 
+  const allClear = !today.error && counts.attention === 0 && reviews.length === 0;
+
   return (
     <Stack>
-      <Card>
-        <AppText variant="title">Reminders today</AppText>
-        {today.error && !today.data ? (
-          <AppText tone="danger">{caregiverError(today.error.code)}</AppText>
-        ) : (
-          <Row gap={8}>
-            <Badge label={`${counts.done} done`} tone="success" />
-            <Badge label={`${counts.upcoming} coming up`} tone="neutral" />
-            <Badge
-              label={`${counts.attention} need attention`}
+      <Stack gap={4}>
+        <AppText variant="huge">Today</AppText>
+        <AppText tone="muted">{today.data ? dateLabelFor(today.data.now) : ' '}</AppText>
+      </Stack>
+
+      {today.error && !today.data ? (
+        <Card tone="danger">
+          <AppText>{caregiverError(today.error.code)}</AppText>
+        </Card>
+      ) : (
+        <Card tone={allClear ? 'success' : 'warn'}>
+          <Row gap={14}>
+            <IconCircle
+              emoji={allClear ? '✅' : '⚠️'}
+              size={64}
+              tone={allClear ? 'success' : 'warn'}
+            />
+            <View style={{ flex: 1, minWidth: 200 }}>
+              <AppText variant="title" tone={allClear ? 'success' : 'warn'}>
+                {allClear ? 'All on track' : `${counts.attention + reviews.length} to look at`}
+              </AppText>
+              <AppText variant="small" tone="muted">
+                {history.data
+                  ? `Last ${history.data.days} days: ${history.data.summary.confirmed} done, ${history.data.summary.missed} missed, ${history.data.summary.skipped} skipped`
+                  : 'Checking in…'}
+              </AppText>
+            </View>
+          </Row>
+          <View style={{ flexDirection: 'row', gap: 10 }}>
+            <StatTile value={counts.done} label="done" tone="success" />
+            <StatTile value={counts.upcoming} label="coming up" />
+            <StatTile
+              value={counts.attention}
+              label="need attention"
               tone={counts.attention ? 'danger' : 'neutral'}
             />
-          </Row>
-        )}
-        {history.data ? (
-          <AppText variant="small" tone="muted">
-            Last {history.data.days} days: {history.data.summary.confirmed} done,{' '}
-            {history.data.summary.missed} missed, {history.data.summary.skipped} skipped
-          </AppText>
-        ) : null}
-      </Card>
+          </View>
+        </Card>
+      )}
 
       {reviews.map((r) => (
         <ReviewCard
@@ -134,13 +159,21 @@ export function CaregiverReminders() {
 
       {attention.map((r) => (
         <Card key={r.occurrence.id} tone="danger">
-          <AppText variant="title" tone="danger">
-            {KIND[r.occurrence.kind].emoji} {KIND[r.occurrence.kind].label} missed
-          </AppText>
+          <Row gap={14}>
+            <IconCircle emoji={KIND[r.occurrence.kind].emoji} size={56} tone="danger" />
+            <View style={{ flex: 1, minWidth: 180 }}>
+              <AppText variant="title" tone="danger">
+                {KIND[r.occurrence.kind].label} missed
+              </AppText>
+              <AppText variant="small" tone="muted">
+                Due {formatTime(r.occurrence.dueAt, r.occurrence.timeZone)}
+              </AppText>
+            </View>
+          </Row>
           <AppText>
-            Due {formatTime(r.occurrence.dueAt, r.occurrence.timeZone)}. Margaret hasn’t confirmed.{' '}
+            They haven’t confirmed.{' '}
             {r.occurrence.kind === 'pill'
-              ? 'Only mark it done if you gave it to her yourself.'
+              ? 'Only mark it done if you gave it to them yourself.'
               : ''}
           </AppText>
           <BigButton
@@ -153,93 +186,107 @@ export function CaregiverReminders() {
         </Card>
       ))}
 
-      <Card>
-        {rows.length === 0 ? <AppText tone="muted">Nothing scheduled for today.</AppText> : null}
-        {rows.map((r) => (
-          <Row key={r.occurrence.id} gap={10}>
-            <AppText>{KIND[r.occurrence.kind].emoji}</AppText>
-            <AppText bold>{KIND[r.occurrence.kind].label}</AppText>
-            <Badge label={r.status} tone={r.tone} />
-            {r.check ? <Badge label={r.check.label} tone={r.check.tone} /> : null}
-            {r.canMarkDone && !r.needsAttention ? (
-              <Chip label="Mark done" onPress={() => void markDone(r.occurrence)} />
-            ) : null}
-          </Row>
-        ))}
-      </Card>
+      <Segmented options={SECTIONS} value={section} onChange={setSection} />
 
-      <Card>
-        <AppText variant="title">Schedules</AppText>
-        {list.length === 0 ? <AppText tone="muted">No reminders set up yet.</AppText> : null}
-        {list.map((s) => (
-          <Stack key={s.id} gap={8}>
-            <Row gap={10}>
-              <AppText>{KIND[s.kind].emoji}</AppText>
-              <AppText bold>
-                {KIND[s.kind].label} · {formatTime(`2026-01-01T${s.localTime}:00Z`, 'UTC')}
-              </AppText>
-              <AppText variant="small" tone="muted">
-                {daysLabel(s.daysOfWeek)}
-              </AppText>
-              {s.paused ? <Badge label="Paused" tone="warn" /> : null}
-            </Row>
-            <Row gap={8}>
-              <Chip
-                label={s.paused ? 'Resume' : 'Pause'}
-                onPress={() =>
-                  void call(s.id, 'PATCH', `/schedules/${s.id}`, { paused: !s.paused })
-                }
-              />
-              <Chip
-                label={confirmDelete === s.id ? 'Tap again to delete' : 'Delete'}
-                selected={confirmDelete === s.id}
-                onPress={() => {
-                  if (confirmDelete !== s.id) return setConfirmDelete(s.id);
-                  setConfirmDelete(null);
-                  void call(s.id, 'DELETE', `/schedules/${s.id}`);
-                }}
-              />
-            </Row>
-          </Stack>
-        ))}
-      </Card>
-
-      <Card>
-        <AppText variant="title">Add a reminder</AppText>
-        <Row gap={8}>
-          {REMINDER_KINDS.map((k) => (
-            <Chip
-              key={k}
-              label={`${KIND[k].emoji} ${KIND[k].label}`}
-              selected={k === kind}
-              onPress={() => setKind(k)}
-            />
+      {section === 'today' ? (
+        <Card>
+          {rows.length === 0 ? <AppText tone="muted">Nothing scheduled for today.</AppText> : null}
+          {rows.map((r, i) => (
+            <View key={r.occurrence.id} style={[styles.rowItem, i > 0 && styles.rowDivider]}>
+              <IconCircle emoji={KIND[r.occurrence.kind].emoji} size={48} tone={r.tone} />
+              <View style={{ flex: 1, minWidth: 140, gap: 6 }}>
+                <AppText bold>{KIND[r.occurrence.kind].label}</AppText>
+                <Row gap={6}>
+                  <Badge label={r.status} tone={r.tone} />
+                  {r.check ? <Badge label={r.check.label} tone={r.check.tone} /> : null}
+                </Row>
+              </View>
+              {r.canMarkDone && !r.needsAttention ? (
+                <Chip label="Mark done" onPress={() => void markDone(r.occurrence)} />
+              ) : null}
+            </View>
           ))}
-        </Row>
-        <Field
-          label="Time (e.g. 8:30 or 20:00)"
-          value={time}
-          onChangeText={setTime}
-          placeholder="08:00"
-        />
-        {time && !hhmm ? (
-          <AppText variant="small" tone="danger">
-            That doesn’t look like a time.
+        </Card>
+      ) : null}
+
+      {section === 'schedules' ? (
+        <Card>
+          {list.length === 0 ? <AppText tone="muted">No reminders set up yet.</AppText> : null}
+          {list.map((s, i) => (
+            <View key={s.id} style={[{ gap: 10 }, i > 0 && styles.rowDivider]}>
+              <View style={styles.rowItem}>
+                <IconCircle emoji={KIND[s.kind].emoji} size={48} />
+                <View style={{ flex: 1, minWidth: 140 }}>
+                  <AppText bold>
+                    {KIND[s.kind].label} · {formatTime(`2026-01-01T${s.localTime}:00Z`, 'UTC')}
+                  </AppText>
+                  <AppText variant="small" tone="muted">
+                    {daysLabel(s.daysOfWeek)}
+                  </AppText>
+                </View>
+                {s.paused ? <Badge label="Paused" tone="warn" /> : null}
+              </View>
+              <Row gap={8}>
+                <Chip
+                  label={s.paused ? 'Resume' : 'Pause'}
+                  onPress={() =>
+                    void call(s.id, 'PATCH', `/schedules/${s.id}`, { paused: !s.paused })
+                  }
+                />
+                <Chip
+                  label={confirmDelete === s.id ? 'Tap again to delete' : 'Delete'}
+                  selected={confirmDelete === s.id}
+                  onPress={() => {
+                    if (confirmDelete !== s.id) return setConfirmDelete(s.id);
+                    setConfirmDelete(null);
+                    void call(s.id, 'DELETE', `/schedules/${s.id}`);
+                  }}
+                />
+              </Row>
+            </View>
+          ))}
+        </Card>
+      ) : null}
+
+      {section === 'add' ? (
+        <Card>
+          <AppText variant="title">Add a reminder</AppText>
+          <Row gap={8}>
+            {REMINDER_KINDS.map((k) => (
+              <Chip
+                key={k}
+                label={`${KIND[k].emoji} ${KIND[k].label}`}
+                selected={k === kind}
+                onPress={() => setKind(k)}
+              />
+            ))}
+          </Row>
+          <Field
+            label="Time (e.g. 8:30 or 20:00)"
+            value={time}
+            onChangeText={setTime}
+            placeholder="08:00"
+          />
+          {time && !hhmm ? (
+            <AppText variant="small" tone="danger">
+              That doesn’t look like a time.
+            </AppText>
+          ) : null}
+          <BigButton
+            label="Add reminder"
+            disabled={!hhmm || !!busyId}
+            busy={busyId === 'new'}
+            onPress={async () => {
+              await call('new', 'POST', '/schedules', { kind, localTime: hhmm, timeZone: tz });
+              setTime('');
+              setSection('schedules');
+            }}
+          />
+          <AppText variant="small" tone="muted">
+            Repeats every day · time zone {tz}
           </AppText>
-        ) : null}
-        <BigButton
-          label="Add reminder"
-          disabled={!hhmm || !!busyId}
-          busy={busyId === 'new'}
-          onPress={async () => {
-            await call('new', 'POST', '/schedules', { kind, localTime: hhmm, timeZone: tz });
-            setTime('');
-          }}
-        />
-        <AppText variant="small" tone="muted">
-          Repeats every day · time zone {tz}
-        </AppText>
-      </Card>
+        </Card>
+      ) : null}
 
       {problem ? (
         <Card tone="danger">
@@ -249,6 +296,18 @@ export function CaregiverReminders() {
     </Stack>
   );
 }
+
+const SECTIONS = [
+  { id: 'today', label: 'Today' },
+  { id: 'schedules', label: 'Schedules' },
+  { id: 'add', label: 'Add new' },
+] as const;
+type Section = (typeof SECTIONS)[number]['id'];
+
+const styles = StyleSheet.create({
+  rowItem: { flexDirection: 'row', alignItems: 'center', gap: 14, flexWrap: 'wrap' },
+  rowDivider: { borderTopWidth: 1, borderTopColor: '#E9E4D6', paddingTop: 16 },
+});
 
 function ReviewCard({
   row,
@@ -271,8 +330,8 @@ function ReviewCard({
       </AppText>
       <AppText>
         {wrong
-          ? 'The photos do not seem to show Margaret taking her pill. She tapped “I took it”, so it counts as taken until you decide.'
-          : 'The check could not tell. She tapped “I took it”, so it counts as taken. Look at the photos if you want to be sure.'}
+          ? 'The photos do not seem to show them taking the pill. They tapped “I took it”, so it counts as taken until you decide.'
+          : 'The check could not tell. They tapped “I took it”, so it counts as taken. Look at the photos if you want to be sure.'}
       </AppText>
       {photos ? (
         <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>

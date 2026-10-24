@@ -4,6 +4,8 @@ import {
   caregiverCounts,
   caregiverError,
   caregiverRows,
+  dateLabelFor,
+  greetingFor,
   normalizeTime,
   pickPatientFocus,
   pillCheckBadge,
@@ -175,5 +177,17 @@ describe('pill photo check (caregiver view)', () => {
       confirmation: { at: 'x', by: 'c', method: 'caregiver', verification: 'unverified' },
     });
     expect(pillCheckBadge(o)).toBeNull();
+  });
+});
+
+describe('greetingFor / dateLabelFor (server time, not device time)', () => {
+  it('greets by the hour in the given zone', () => {
+    expect(greetingFor('2026-06-02T08:00:00Z', 'UTC')).toBe('Good morning');
+    expect(greetingFor('2026-06-02T13:00:00Z', 'UTC')).toBe('Good afternoon');
+    expect(greetingFor('2026-06-02T20:00:00Z', 'UTC')).toBe('Good evening');
+    expect(greetingFor('2026-06-02T00:30:00Z', 'UTC')).toBe('Good morning'); // midnight hour
+  });
+  it('shows the weekday and date', () => {
+    expect(dateLabelFor('2026-06-02T08:00:00Z', 'UTC')).toBe('Tuesday, June 2');
   });
 });

@@ -1,17 +1,34 @@
 import { useEffect, useState } from 'react';
-import { Text } from 'react-native';
+import { View } from 'react-native';
 import { ApiError } from '@core/client/api';
 import { formatTime } from '@core/client/format';
 import { usePoll } from '@core/client/hooks';
 import { useSession } from '@core/client/session';
-import { AppText, BigButton, Card, Stack } from '@core/design-system/components';
+import {
+  AppText,
+  BigButton,
+  Card,
+  IconCircle,
+  ProgressDots,
+  Stack,
+} from '@core/design-system/components';
 import type { VisionFrame } from '@core/ai/vision';
-import { checkError, KIND, patientError, pickPatientFocus, type TodayResponse } from './model';
+import {
+  checkError,
+  dateLabelFor,
+  greetingFor,
+  KIND,
+  patientError,
+  pickPatientFocus,
+  type TodayResponse,
+} from './model';
 import { PillCamera } from './PillCamera';
 
 const BASE = '/api/reminders';
 const Emoji = ({ children }: { children: string }) => (
-  <Text style={{ fontSize: 72, textAlign: 'center' }}>{children}</Text>
+  <View style={{ alignItems: 'center' }}>
+    <IconCircle emoji={children} size={120} />
+  </View>
 );
 
 /** Patient view: ONE card, ONE primary button. Plain words, no codes. */
@@ -197,9 +214,16 @@ export function PatientReminders() {
     );
   }
 
+  const total = items.filter((o) => o.phase !== 'skipped').length;
+  const doneCount = items.filter((o) => o.phase === 'confirmed').length;
   return (
     <Stack>
+      <Stack gap={4}>
+        <AppText variant="huge">{greetingFor(data.now)}</AppText>
+        <AppText tone="muted">{dateLabelFor(data.now)}</AppText>
+      </Stack>
       {card}
+      {total > 0 && focus.kind !== 'idle' ? <ProgressDots done={doneCount} total={total} /> : null}
       {note ? (
         <Card>
           <AppText center>{note}</AppText>

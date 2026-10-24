@@ -205,3 +205,29 @@ export interface TodayResponse {
   now: string;
   occurrences: OccurrenceView[];
 }
+
+/** "Good morning" / "Good afternoon" / "Good evening" for the SERVER's now (never the device clock). */
+export function greetingFor(nowIso: string, timeZone?: string): string {
+  let hour: number;
+  try {
+    hour = Number(
+      new Intl.DateTimeFormat('en-US', { hour: 'numeric', hour12: false, timeZone }).format(
+        new Date(nowIso),
+      ),
+    );
+  } catch {
+    hour = new Date(nowIso).getHours();
+  }
+  hour %= 24;
+  return hour < 12 ? 'Good morning' : hour < 18 ? 'Good afternoon' : 'Good evening';
+}
+
+/** "Tuesday, June 2" for the server's now. */
+export function dateLabelFor(nowIso: string, timeZone?: string): string {
+  const opts = { weekday: 'long', month: 'long', day: 'numeric' } as const;
+  try {
+    return new Intl.DateTimeFormat('en-US', { ...opts, timeZone }).format(new Date(nowIso));
+  } catch {
+    return new Intl.DateTimeFormat('en-US', opts).format(new Date(nowIso));
+  }
+}
