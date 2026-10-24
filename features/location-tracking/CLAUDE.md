@@ -59,7 +59,20 @@ Until the Supabase adapter lands, the in-memory store in `server/store.ts` is th
 - [x] Flag off => feature inert
 - [x] `demoSeed` implemented; works end-to-end in demo mode
 
+## Device tracker (`tracker/`)
+
+- `tracker.ts` (pure, unit-tested): throttles OS fixes to one per `REPORT_INTERVAL_MS`, queues offline (bounded to ~24h,
+  persisted), uploads oldest first in batches of at most `MAX_BATCH`, single-flight. Mocked/invalid fixes are ignored;
+  future device timestamps are clamped to now. A server 400 drops that batch (it would block the queue forever);
+  401/403 keeps the data and reports `signed_out` (no confusing logout); network errors keep it and report `offline`.
+- `http.ts`: uploader for `POST /readings`. `expo.ts`: expo-location + TaskManager adapter (`createDeviceTracker`,
+  `startTracking`, `stopTracking`, `ensurePermissions`). `timeInterval` is Android-only, so the 5-minute cadence is
+  enforced in the tracker, not by the OS. iOS needs the user to grant "Always"; with "When in use" the tracker only runs
+  in the foreground.
+- **Not verified on a real device yet** (dev build required). **Not wired into the app yet:** `TaskManager.defineTask` must
+  run at app start, so the app root (shell, shared) must import `tracker/expo.ts` and call `startTracking` after patient
+  login; do that in a separate shell change agreed with the other dev.
+
 ## Later PRs
 
-PR 2: device tracker (5-minute throttle, offline queue, expo-location behind an injected source).
-PR 3: caregiver map screen ("last seen", "Demo data" badge).
+PR 3: caregiver map screen ("last seen", "Demo data" badge) and the patient "sharing your location" status.
