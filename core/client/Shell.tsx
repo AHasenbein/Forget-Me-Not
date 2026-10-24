@@ -1,15 +1,17 @@
 import { Link, usePathname, useRouter } from 'expo-router';
 import { useState } from 'react';
-import { Pressable, View } from 'react-native';
+import { Pressable, Text, View } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import {
   AppText,
   BigButton,
   Badge,
   Card,
   Chip,
+  IconCircle,
   Row,
+  Segmented,
   Screen,
-  Stack,
 } from '../design-system/components';
 import { palette } from '../design-system/tokens';
 import { ApiError } from './api';
@@ -20,63 +22,125 @@ import { PERSONAS, TEXT_SIZES, useSession } from './session';
 import { widgetsFor } from './widgets';
 
 export function TopBar() {
-  const { demo, persona, setPersona } = useSession();
+  const { demo, persona, setPersona, role } = useSession();
   const path = usePathname();
+  const insets = useSafeAreaInsets();
   const onSettings = path === '/settings';
+  const patient = role === 'patient';
   return (
     <View
       style={{
-        backgroundColor: palette.card,
-        borderBottomWidth: 2,
-        borderColor: palette.border,
-        padding: 12,
+        backgroundColor: palette.bg,
+        paddingTop: insets.top + 8,
+        paddingHorizontal: 20,
+        paddingBottom: 8,
         gap: 8,
+        alignItems: 'center',
       }}
     >
-      <Row gap={8}>
-        <View style={{ flex: 1, minWidth: 140 }}>
-          <AppText variant="body" bold>
-            Forget Me Not
-          </AppText>
-        </View>
-        {/* Demo badge never shows on patient screens (root rule). */}
-        {demo && persona !== 'patient' ? <Badge label="Demo data" tone="warn" /> : null}
-        <Link href={onSettings ? '/' : '/settings'} asChild>
-          <Pressable
-            accessibilityRole="button"
-            accessibilityLabel={onSettings ? 'Back to home' : 'Settings'}
-            style={{
-              minHeight: 64,
-              minWidth: 64,
-              alignItems: 'center',
-              justifyContent: 'center',
-              borderWidth: 2,
-              borderRadius: 16,
-              borderColor: palette.border,
-              paddingHorizontal: 12,
-            }}
-          >
-            <AppText variant="small" bold>
-              {onSettings ? '← Back' : '⚙ Settings'}
-            </AppText>
-          </Pressable>
-        </Link>
-      </Row>
-      {demo ? (
+      <View style={{ width: '100%', maxWidth: 720, gap: 8 }}>
         <Row gap={8}>
-          <AppText variant="small" tone="muted">
-            View as:
-          </AppText>
-          {PERSONAS.map((p) => (
-            <Chip
-              key={p.id}
-              label={p.label}
-              selected={p.id === persona}
-              onPress={() => setPersona(p.id)}
-            />
-          ))}
+          <View style={{ flex: 1, flexDirection: 'row', alignItems: 'center', gap: 10 }}>
+            <IconCircle emoji="🌼" size={40} />
+            <AppText variant="small" bold>
+              Forget Me Not
+            </AppText>
+          </View>
+          {/* Demo badge never shows on patient screens (root rule). */}
+          {demo && !patient ? <Badge label="Demo data" tone="warn" /> : null}
+          {/* Patient: one calm corner control. Caregiver uses the bottom bar instead. */}
+          {patient ? (
+            <Link href={onSettings ? '/' : '/settings'} asChild>
+              <Pressable
+                accessibilityRole="button"
+                accessibilityLabel={onSettings ? 'Back to home' : 'Settings'}
+                style={{
+                  minHeight: 64,
+                  minWidth: 64,
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  borderRadius: 32,
+                  backgroundColor: palette.card,
+                  borderWidth: 1,
+                  borderColor: palette.border,
+                  paddingHorizontal: 16,
+                }}
+              >
+                <AppText variant="small" bold>
+                  {onSettings ? '← Back' : '⚙️ Settings'}
+                </AppText>
+              </Pressable>
+            </Link>
+          ) : null}
         </Row>
-      ) : null}
+        {demo ? (
+          <Segmented
+            options={PERSONAS.map((p) => ({ id: p.id, label: `View as ${p.label.toLowerCase()}` }))}
+            value={persona}
+            onChange={setPersona}
+          />
+        ) : null}
+      </View>
+    </View>
+  );
+}
+
+const NAV = [
+  { href: '/', label: 'Home', emoji: '🏠' },
+  { href: '/settings', label: 'Settings', emoji: '⚙️' },
+] as const;
+
+/** Caregiver bottom bar: two big labelled destinations, always visible, never hidden off-screen. */
+export function BottomNav() {
+  const { role, liveStatus } = useSession();
+  const path = usePathname();
+  const insets = useSafeAreaInsets();
+  if (role !== 'primary_caregiver' || liveStatus !== 'ready') return null;
+  return (
+    <View
+      accessibilityRole="tablist"
+      style={{
+        flexDirection: 'row',
+        backgroundColor: palette.card,
+        borderTopWidth: 1,
+        borderColor: palette.border,
+        paddingBottom: insets.bottom + 4,
+        paddingTop: 4,
+      }}
+    >
+      {NAV.map((n) => {
+        const on = n.href === '/' ? path === '/' : path.startsWith(n.href);
+        return (
+          <Link key={n.href} href={n.href} asChild>
+            <Pressable
+              accessibilityRole="tab"
+              accessibilityState={{ selected: on }}
+              style={{ flex: 1, minHeight: 64, alignItems: 'center', justifyContent: 'center' }}
+            >
+              <View
+                style={{
+                  paddingHorizontal: 24,
+                  paddingVertical: 6,
+                  borderRadius: 999,
+                  backgroundColor: on ? palette.primaryBg : 'transparent',
+                  alignItems: 'center',
+                }}
+              >
+                <Text style={{ fontSize: 22 }}>{n.emoji}</Text>
+                <Text
+                  style={{
+                    fontSize: 16,
+                    fontWeight: '700',
+                    color: on ? palette.primary : palette.muted,
+                  }}
+                >
+                  {n.label}
+                </Text>
+              </View>
+            </Pressable>
+          </Link>
+        );
+      })}
     </View>
   );
 }
@@ -98,11 +162,6 @@ function Widgets() {
     </>
   );
 }
-
-const today = () =>
-  new Intl.DateTimeFormat('en-US', { weekday: 'long', month: 'long', day: 'numeric' }).format(
-    new Date(),
-  );
 
 export function Home() {
   const { role, liveStatus, signOut } = useSession();
@@ -136,12 +195,9 @@ export function Home() {
         </Card>
       </Screen>
     );
+  // The date and greeting come from the widgets (they use the server's `now`, not the device clock).
   return (
     <Screen>
-      <Stack gap={4}>
-        <AppText variant="huge">{role === 'patient' ? 'Today' : 'Margaret’s day'}</AppText>
-        <AppText tone="muted">{today()}</AppText>
-      </Stack>
       <Widgets />
     </Screen>
   );
@@ -265,16 +321,11 @@ export function SettingsScreen() {
       <AppText variant="huge">Settings</AppText>
       <Card>
         <AppText variant="title">Text size</AppText>
-        <Row gap={8}>
-          {TEXT_SIZES.map((t) => (
-            <Chip
-              key={t.label}
-              label={t.label}
-              selected={t.scale === textScale}
-              onPress={() => setTextScale(t.scale)}
-            />
-          ))}
-        </Row>
+        <Segmented
+          options={TEXT_SIZES.map((t) => ({ id: String(t.scale), label: t.label }))}
+          value={String(textScale)}
+          onChange={(v) => setTextScale(Number(v))}
+        />
         <AppText>This is how large the words look on this device.</AppText>
       </Card>
       {demo && role !== 'circle_member' ? <DemoTools /> : null}

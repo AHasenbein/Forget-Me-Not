@@ -1,13 +1,13 @@
 import { useState } from 'react';
 import { TextInput, View } from 'react-native';
 import type { QuickAccount } from '../auth/quick-login';
-import { AppText, BigButton, Card, Screen } from '../design-system/components';
+import { AppText, BigButton, Card, IconCircle, Screen, Stack } from '../design-system/components';
 import { palette } from '../design-system/tokens';
 import { useSession } from './session';
 
 const input = {
   borderWidth: 2,
-  borderColor: palette.border,
+  borderColor: palette.inputBorder,
   borderRadius: 12,
   paddingHorizontal: 12,
   minHeight: 64,
@@ -100,7 +100,13 @@ export function SignIn() {
 
   return (
     <Screen>
-      <AppText variant="huge">{quickLogin ? 'Who are you?' : 'Sign in'}</AppText>
+      <Stack gap={12}>
+        <IconCircle emoji="🌼" size={88} />
+        <AppText variant="huge">{quickLogin ? 'Who are you?' : 'Welcome back'}</AppText>
+        <AppText tone="muted">
+          {quickLogin ? 'Tap one to continue.' : 'Sign in to see your day.'}
+        </AppText>
+      </Stack>
       {quickLogin ? (
         <Card>
           {CHOICES.map((c) => (

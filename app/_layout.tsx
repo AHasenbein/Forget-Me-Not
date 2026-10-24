@@ -1,7 +1,7 @@
 import { Slot } from 'expo-router';
 import { View } from 'react-native';
 import { SessionProvider } from '@core/client/session';
-import { TopBar } from '@core/client/Shell';
+import { BottomNav, TopBar } from '@core/client/Shell';
 
 export default function RootLayout() {
   return (
@@ -9,6 +9,7 @@ export default function RootLayout() {
       <View style={{ flex: 1 }}>
         <TopBar />
         <Slot />
+        <BottomNav />
       </View>
     </SessionProvider>
   );
