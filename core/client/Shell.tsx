@@ -42,9 +42,14 @@ export function TopBar() {
         <Row gap={8}>
           <View style={{ flex: 1, flexDirection: 'row', alignItems: 'center', gap: 10 }}>
             <IconCircle emoji="🌼" size={40} />
-            <AppText variant="small" bold>
-              Forget Me Not
-            </AppText>
+            {!patient ? (
+              <Text
+                numberOfLines={1}
+                style={{ fontSize: 18, fontWeight: '700', color: palette.text }}
+              >
+                Forget Me Not
+              </Text>
+            ) : null}
           </View>
           {/* Demo badge never shows on patient screens (root rule). */}
           {demo && !patient ? <Badge label="Demo data" tone="warn" /> : null}
@@ -66,9 +71,9 @@ export function TopBar() {
                   paddingHorizontal: 16,
                 }}
               >
-                <AppText variant="small" bold>
+                <Text style={{ fontSize: 24, fontWeight: '700', color: palette.text }}>
                   {onSettings ? '← Back' : '⚙️ Settings'}
-                </AppText>
+                </Text>
               </Pressable>
             </Link>
           ) : null}

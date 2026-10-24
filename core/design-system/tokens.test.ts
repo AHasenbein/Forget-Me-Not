@@ -32,6 +32,9 @@ describe('palette contrast (WCAG AA = 4.5:1 text)', () => {
     ['danger on dangerBg', p.danger, p.dangerBg],
     ['danger on card', p.danger, p.card],
     ['onPrimary on danger', p.onPrimary, p.danger],
+    ['muted on track (segmented)', p.muted, p.track],
+    ['primary on card (selected segment)', p.primary, p.card],
+    ['muted on sunken', p.muted, p.sunken],
     ['muted on warnBg', p.muted, p.warnBg],
   ];
   it.each(pairs)('%s', (_n, fg, bg) => expect(ratio(fg, bg)).toBeGreaterThanOrEqual(4.5));

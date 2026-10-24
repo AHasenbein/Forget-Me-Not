@@ -219,8 +219,8 @@ export function PatientReminders() {
   return (
     <Stack>
       <Stack gap={4}>
-        <AppText variant="huge">{greetingFor(data.now)}</AppText>
-        <AppText tone="muted">{dateLabelFor(data.now)}</AppText>
+        <AppText variant="huge">{greetingFor(data.now, items[0]?.timeZone)}</AppText>
+        <AppText tone="muted">{dateLabelFor(data.now, items[0]?.timeZone)}</AppText>
       </Stack>
       {card}
       {total > 0 && focus.kind !== 'idle' ? <ProgressDots done={doneCount} total={total} /> : null}

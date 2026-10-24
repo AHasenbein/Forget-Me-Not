@@ -16,6 +16,8 @@ export const palette = {
   text: '#16201C',
   muted: '#4B5753',
   border: '#D9D3C5',
+  sunken: '#EFEBDF',
+  track: '#E9E4D6',
   inputBorder: '#6B7772',
   borderStrong: '#16201C',
   primary: '#0F5B45',

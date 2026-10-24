@@ -24,7 +24,9 @@ export function AppText({
   const scale = useTextScale();
   const color =
     tone === 'muted' ? palette.muted : tone && tone !== 'neutral' ? palette[tone] : palette.text;
-  const size = SIZE[variant] * scale;
+  // Headlines stop growing at 1.25x: at 1.5x a 40px title swallows a phone screen.
+  const size =
+    SIZE[variant] * (variant === 'huge' || variant === 'title' ? Math.min(scale, 1.25) : scale);
   return (
     <Text
       style={{
@@ -243,7 +245,7 @@ export function IconCircle({
         height: size,
         borderRadius: size / 2,
         backgroundColor:
-          tone === 'neutral' ? '#EFEBDF' : tone === 'primary' ? BG.primary : palette.card,
+          tone === 'neutral' ? palette.sunken : tone === 'primary' ? BG.primary : palette.card,
         borderWidth: tone === 'neutral' || tone === 'primary' ? 0 : 2,
         borderColor: EDGE[tone],
         alignItems: 'center',
@@ -389,7 +391,7 @@ const s = StyleSheet.create({
   },
   segment: {
     flexDirection: 'row',
-    backgroundColor: '#E9E4D6',
+    backgroundColor: palette.track,
     borderRadius: radius.md,
     padding: 4,
     gap: 4,
@@ -404,7 +406,7 @@ const s = StyleSheet.create({
   },
   stat: {
     flexGrow: 1,
-    flexBasis: 0,
+    flexBasis: 96,
     borderWidth: 1.5,
     borderRadius: radius.md,
     paddingVertical: 14,

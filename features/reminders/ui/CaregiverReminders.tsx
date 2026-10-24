@@ -17,6 +17,7 @@ import {
   Stack,
   StatTile,
 } from '@core/design-system/components';
+import { palette } from '@core/design-system/tokens';
 import type { ReminderKind, Schedule } from '../schemas';
 import { REMINDER_KINDS } from '../schemas';
 import {
@@ -108,7 +109,7 @@ export function CaregiverReminders() {
     <Stack>
       <Stack gap={4}>
         <AppText variant="huge">Today</AppText>
-        <AppText tone="muted">{today.data ? dateLabelFor(today.data.now) : ' '}</AppText>
+        <AppText tone="muted">{today.data ? dateLabelFor(today.data.now, tz) : ' '}</AppText>
       </Stack>
 
       {today.error && !today.data ? (
@@ -134,7 +135,7 @@ export function CaregiverReminders() {
               </AppText>
             </View>
           </Row>
-          <View style={{ flexDirection: 'row', gap: 10 }}>
+          <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 10 }}>
             <StatTile value={counts.done} label="done" tone="success" />
             <StatTile value={counts.upcoming} label="coming up" />
             <StatTile
@@ -265,7 +266,7 @@ export function CaregiverReminders() {
             label="Time (e.g. 8:30 or 20:00)"
             value={time}
             onChangeText={setTime}
-            placeholder="08:00"
+            placeholder="e.g. 8:30"
           />
           {time && !hhmm ? (
             <AppText variant="small" tone="danger">
@@ -306,7 +307,7 @@ type Section = (typeof SECTIONS)[number]['id'];
 
 const styles = StyleSheet.create({
   rowItem: { flexDirection: 'row', alignItems: 'center', gap: 14, flexWrap: 'wrap' },
-  rowDivider: { borderTopWidth: 1, borderTopColor: '#E9E4D6', paddingTop: 16 },
+  rowDivider: { borderTopWidth: 1, borderTopColor: palette.border, paddingTop: 16 },
 });
 
 function ReviewCard({
