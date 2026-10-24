@@ -54,27 +54,29 @@ export function createReminderService({ store, bus, notifier, now }: ReminderDep
     if (!roles.includes(user.role)) throw new HttpError(403, 'forbidden');
   };
   /** 404 (never 403) for another patient's data: don't confirm that the id exists. */
-  const ownOccurrence = (user: AuthUser, id: string) => {
-    const o = store.getOccurrence(id);
+  const ownOccurrence = async (user: AuthUser, id: string) => {
+    const o = await store.getOccurrence(id);
     if (!o || o.patientId !== patientOf(user)) throw new HttpError(404, 'not_found');
     return o;
   };
-  const ownSchedule = (user: AuthUser, id: string) => {
-    const s = store.getSchedule(id);
+  const ownSchedule = async (user: AuthUser, id: string) => {
+    const s = await store.getSchedule(id);
     if (!s || s.patientId !== patientOf(user)) throw new HttpError(404, 'not_found');
     return s;
   };
 
-  const recentPillConfirmation = (patientId: string, exceptId: string, at: number) =>
-    store
-      .listOccurrences(patientId)
-      .some(
-        (o) =>
-          o.id !== exceptId &&
-          o.kind === 'pill' &&
-          o.confirmation &&
-          Math.abs(at - Date.parse(o.confirmation.at)) < PILL_MIN_GAP_MIN * MIN,
-      );
+  /**
+   * Known limit: this check reads and the confirm that follows writes, so two simultaneous confirms of two
+   * DIFFERENT pill occurrences could both pass. Closing it needs a database-side guard (Postgres function).
+   */
+  const recentPillConfirmation = async (patientId: string, exceptId: string, at: number) =>
+    (await store.listOccurrences(patientId)).some(
+      (o) =>
+        o.id !== exceptId &&
+        o.kind === 'pill' &&
+        o.confirmation &&
+        Math.abs(at - Date.parse(o.confirmation.at)) < PILL_MIN_GAP_MIN * MIN,
+    );
 
   function phaseOf(o: Occurrence, at: number): Phase {
     if (o.status !== 'pending') return o.status;
@@ -85,16 +87,15 @@ export function createReminderService({ store, bus, notifier, now }: ReminderDep
   const view = (o: Occurrence, at: number) => ({ ...o, phase: phaseOf(o, at) });
 
   /** Creates today's (local) occurrence for each active schedule. Idempotent. */
-  function ensureToday(schedules: Schedule[], at: Date) {
+  async function ensureToday(schedules: Schedule[], at: Date) {
     for (const s of schedules) {
       if (s.paused) continue;
       const localDate = localDateOf(at, s.timeZone);
       if (!s.daysOfWeek.includes(weekdayOf(localDate))) continue;
       const id = `${s.id}:${localDate}`;
-      if (store.getOccurrence(id)) continue;
       const due = localTimeToUtc(localDate, s.localTime, s.timeZone);
       if (due.getTime() < Date.parse(s.activeFrom)) continue;
-      store.putOccurrence({
+      await store.insertOccurrenceIfAbsent({
         id,
         scheduleId: s.id,
         patientId: s.patientId,
@@ -114,10 +115,10 @@ export function createReminderService({ store, bus, notifier, now }: ReminderDep
 
   return {
     // ---- caregiver: manage schedules -------------------------------------------------------
-    createSchedule(user: AuthUser, input: CreateScheduleInput): Schedule {
+    async createSchedule(user: AuthUser, input: CreateScheduleInput): Promise<Schedule> {
       requireRole(user, 'primary_caregiver');
       const patientId = patientOf(user);
-      if (store.listSchedules(patientId).length >= MAX_SCHEDULES)
+      if ((await store.listSchedules(patientId)).length >= MAX_SCHEDULES)
         throw new HttpError(409, 'too_many');
       const s: Schedule = {
         id: crypto.randomUUID(),
@@ -127,57 +128,55 @@ export function createReminderService({ store, bus, notifier, now }: ReminderDep
         createdBy: user.id,
         activeFrom: now().toISOString(),
       };
-      store.putSchedule(s);
+      await store.putSchedule(s);
       return s;
     },
 
-    updateSchedule(user: AuthUser, id: string, patch: PatchScheduleInput): Schedule {
+    async updateSchedule(user: AuthUser, id: string, patch: PatchScheduleInput): Promise<Schedule> {
       requireRole(user, 'primary_caregiver');
-      const s = { ...ownSchedule(user, id), ...patch };
+      const s = { ...(await ownSchedule(user, id)), ...patch };
       if (patch.localTime || patch.timeZone || patch.daysOfWeek) {
         s.activeFrom = now().toISOString();
         // Today's not-yet-actioned occurrence is regenerated from the new time.
-        for (const o of store.listOccurrences(s.patientId))
+        for (const o of await store.listOccurrences(s.patientId))
           if (o.scheduleId === s.id && o.status === 'pending' && o.nudges === 0)
-            store.deleteOccurrence(o.id);
+            await store.deleteOccurrence(o.id);
       }
-      store.putSchedule(s);
+      await store.putSchedule(s);
       return s;
     },
 
-    deleteSchedule(user: AuthUser, id: string): void {
+    async deleteSchedule(user: AuthUser, id: string): Promise<void> {
       requireRole(user, 'primary_caregiver');
-      const s = ownSchedule(user, id);
-      for (const o of store.listOccurrences(s.patientId))
-        if (o.scheduleId === s.id && o.status === 'pending') store.deleteOccurrence(o.id);
-      store.deleteSchedule(s.id);
+      const s = await ownSchedule(user, id);
+      for (const o of await store.listOccurrences(s.patientId))
+        if (o.scheduleId === s.id && o.status === 'pending') await store.deleteOccurrence(o.id);
+      await store.deleteSchedule(s.id);
     },
 
-    listSchedules(user: AuthUser): Schedule[] {
+    async listSchedules(user: AuthUser): Promise<Schedule[]> {
       requireRole(user, 'patient', 'primary_caregiver');
       return store.listSchedules(patientOf(user));
     },
 
     // ---- patient + caregiver ---------------------------------------------------------------
-    today(user: AuthUser) {
+    async today(user: AuthUser) {
       requireRole(user, 'patient', 'primary_caregiver');
       const patientId = patientOf(user);
       const at = now();
-      ensureToday(store.listSchedules(patientId), at);
-      return store
-        .listOccurrences(patientId)
+      await ensureToday(await store.listSchedules(patientId), at);
+      return (await store.listOccurrences(patientId))
         .filter((o) => o.localDate === localDateOf(at, o.timeZone))
         .sort((a, b) => a.dueAt.localeCompare(b.dueAt))
         .map((o) => view(o, at.getTime()));
     },
 
     /** Last `days` days (default 7, max 30) with a summary, for the caregiver. */
-    history(user: AuthUser, days: number) {
+    async history(user: AuthUser, days: number) {
       requireRole(user, 'patient', 'primary_caregiver');
       const n = Number.isInteger(days) ? Math.min(30, Math.max(1, days)) : 7;
       const at = now().getTime();
-      const items = store
-        .listOccurrences(patientOf(user))
+      const items = (await store.listOccurrences(patientOf(user)))
         .filter((o) => dueMs(o) >= at - n * 86_400_000 && dueMs(o) <= at)
         .sort((a, b) => b.dueAt.localeCompare(a.dueAt))
         .map((o) => view(o, at));
@@ -194,9 +193,9 @@ export function createReminderService({ store, bus, notifier, now }: ReminderDep
     },
 
     /** One tap. Idempotent: a second tap returns the existing confirmation. */
-    confirm(user: AuthUser, id: string) {
+    async confirm(user: AuthUser, id: string) {
       requireRole(user, 'patient', 'primary_caregiver');
-      const o = ownOccurrence(user, id);
+      const o = await ownOccurrence(user, id);
       const at = now().getTime();
       if (o.status === 'confirmed') return { occurrence: view(o, at), alreadyConfirmed: true };
       if (o.status === 'skipped') throw new HttpError(409, 'skipped');
@@ -205,56 +204,77 @@ export function createReminderService({ store, bus, notifier, now }: ReminderDep
         throw new HttpError(409, 'expired_ask_caregiver'); // the caregiver may already have given it
       if (!caregiver && at < dueMs(o) - EARLY_WINDOW_MIN * MIN)
         throw new HttpError(409, 'too_early');
-      if (o.kind === 'pill' && recentPillConfirmation(o.patientId, o.id, at))
+      if (o.kind === 'pill' && (await recentPillConfirmation(o.patientId, o.id, at)))
         throw new HttpError(409, 'too_soon');
-      o.status = 'confirmed';
-      o.confirmation = {
-        at: iso(at),
-        by: user.id,
-        method: caregiver ? 'caregiver' : 'tap',
-        verification: 'unverified',
-      };
-      store.putOccurrence(o);
-      return { occurrence: view(o, at), alreadyConfirmed: false };
+      const updated = await store.updateOccurrenceIf(
+        o.id,
+        { status: ['pending', 'missed'] },
+        {
+          status: 'confirmed',
+          confirmation: {
+            at: iso(at),
+            by: user.id,
+            method: caregiver ? 'caregiver' : 'tap',
+            verification: 'unverified',
+          },
+        },
+      );
+      if (!updated) {
+        // Someone else changed it between our read and write: report the truth, never double-confirm.
+        const cur = await store.getOccurrence(o.id);
+        if (cur?.status === 'confirmed')
+          return { occurrence: view(cur, at), alreadyConfirmed: true };
+        throw new HttpError(409, 'changed');
+      }
+      return { occurrence: view(updated, at), alreadyConfirmed: false };
     },
 
     // ---- patient only ----------------------------------------------------------------------
-    snooze(user: AuthUser, id: string) {
+    async snooze(user: AuthUser, id: string) {
       requireRole(user, 'patient');
-      const o = ownOccurrence(user, id);
+      const o = await ownOccurrence(user, id);
       const at = now().getTime();
       if (o.status !== 'pending') throw new HttpError(409, o.status);
       if (at >= escalateMs(o)) throw new HttpError(409, 'overdue');
       if (at < dueMs(o)) throw new HttpError(409, 'not_due');
       if (o.snoozeCount >= MAX_SNOOZES) throw new HttpError(409, 'snooze_limit');
-      o.snoozeCount += 1;
-      o.snoozedUntil = iso(at + SNOOZE_MIN * MIN);
-      o.nudges = 0; // prompt again when the snooze ends
-      store.putOccurrence(o);
-      return view(o, at);
+      const updated = await store.updateOccurrenceIf(
+        o.id,
+        { status: ['pending'], snoozeCount: o.snoozeCount },
+        {
+          snoozeCount: o.snoozeCount + 1,
+          snoozedUntil: iso(at + SNOOZE_MIN * MIN),
+          nudges: 0, // prompt again when the snooze ends
+        },
+      );
+      if (!updated) throw new HttpError(409, 'changed');
+      return view(updated, at);
     },
 
     /**
-     * The clock. Idempotent: running it twice in the same minute does nothing new. Call it from a job
-     * (every minute); it must NOT run from request handlers. Alerts fire once, on the state change.
+     * The clock. Idempotent and safe to run from several processes: every state change is a compare-and-set,
+     * and a push/alert goes out ONLY when this call actually made the change. Call it from a job; it must NOT
+     * run from request handlers.
      */
     async sweep(): Promise<{ nudged: number; escalated: number }> {
       const at = now();
       const t = at.getTime();
       const stats = { nudged: 0, escalated: 0 };
-      const schedules = store.allSchedules();
-      ensureToday(schedules, at);
+      const schedules = await store.allSchedules();
+      await ensureToday(schedules, at);
       const byId = new Map(schedules.map((s) => [s.id, s]));
 
-      for (const o of store.pendingOccurrences()) {
+      for (const o of await store.pendingOccurrences()) {
         const s = byId.get(o.scheduleId);
         if (!s || s.paused) continue; // paused (asleep / in hospital): no prompts, no alerts
 
         if (t >= escalateMs(o)) {
-          o.status = 'missed';
-          o.missedAt = iso(t);
-          store.putOccurrence(o);
-          if (s.escalate) {
+          const missed = await store.updateOccurrenceIf(
+            o.id,
+            { status: ['pending'] },
+            { status: 'missed', missedAt: iso(t) },
+          );
+          if (missed && s.escalate) {
             await bus.emit('caregiver.alert', {
               patientId: o.patientId,
               source: 'reminders',
@@ -265,17 +285,22 @@ export function createReminderService({ store, bus, notifier, now }: ReminderDep
           }
           continue;
         }
-        if (o.kind === 'pill' && recentPillConfirmation(o.patientId, o.id, t)) {
-          o.status = 'skipped'; // another pill was just confirmed: never prompt a second dose
-          store.putOccurrence(o);
+        if (o.kind === 'pill' && (await recentPillConfirmation(o.patientId, o.id, t))) {
+          // another pill was just confirmed: never prompt a second dose
+          await store.updateOccurrenceIf(o.id, { status: ['pending'] }, { status: 'skipped' });
           continue;
         }
         const effective = effectiveMs(o);
         const due1 = t >= effective && o.nudges === 0;
         const due2 = t >= effective + PROMPT_AGAIN_MIN * MIN && o.nudges === 1;
         if (due1 || due2) {
-          o.nudges += 1;
-          store.putOccurrence(o); // record first: a crash must not cause a re-send storm
+          // record first (compare-and-set on the nudge count): a crash or a second sweeper can't re-send
+          const nudged = await store.updateOccurrenceIf(
+            o.id,
+            { status: ['pending'], nudges: o.nudges },
+            { nudges: o.nudges + 1 },
+          );
+          if (!nudged) continue;
           await notifier().push(o.patientId, {
             title: 'Reminder',
             body: PLAIN[o.kind],

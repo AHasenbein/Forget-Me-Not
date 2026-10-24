@@ -25,7 +25,7 @@ describe('reminders escalate to the caregiver when unconfirmed', () => {
       notifier: () => patientPush,
       now: clock.now,
     });
-    svc.createSchedule(caregiver, {
+    await svc.createSchedule(caregiver, {
       kind: 'pill',
       localTime: '08:00',
       daysOfWeek: [0, 1, 2, 3, 4, 5, 6],

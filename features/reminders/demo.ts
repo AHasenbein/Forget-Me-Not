@@ -10,17 +10,17 @@ import { localTimeOf } from './time';
  */
 export const DEMO_OFFSETS_MIN = [2, 6, 10, 14];
 
-export function seedReminders(world: DemoWorld): void {
+export async function seedReminders(world: DemoWorld): Promise<void> {
   const store = getStore();
   getService(); // make sure the runtime exists
   const kinds: [string, Schedule['kind']][] = [
     ...world.reminders.map((r) => [r.id, r.kind] as [string, Schedule['kind']]),
     ['demo-rem-shower', 'shower'],
   ];
-  kinds.forEach(([id, kind], i) => {
-    if (store.getSchedule(`demo-sched-${id}`)) return;
+  for (const [i, [id, kind]] of kinds.entries()) {
+    if (await store.getSchedule(`demo-sched-${id}`)) continue;
     const due = new Date(world.now.getTime() + (DEMO_OFFSETS_MIN[i] ?? 20) * 60_000);
-    store.putSchedule({
+    await store.putSchedule({
       id: `demo-sched-${id}`,
       patientId: world.patient.id,
       kind,
@@ -32,5 +32,5 @@ export function seedReminders(world: DemoWorld): void {
       createdBy: world.caregiver.id,
       activeFrom: world.now.toISOString(),
     });
-  });
+  }
 }
