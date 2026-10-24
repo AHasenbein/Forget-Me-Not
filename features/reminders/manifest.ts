@@ -1,6 +1,12 @@
 import { defineFeature, type RouteContext } from '@core/feature-registry/manifest';
 import { setBus } from './bus-ref';
-import { createScheduleInput, emptyInput, patchScheduleInput } from './schemas';
+import {
+  createScheduleInput,
+  emptyInput,
+  patchScheduleInput,
+  pillCheckInput,
+  reviewInput,
+} from './schemas';
 
 type Handler = keyof typeof import('./routes');
 // Lazy import keeps server-only code out of the app bundle (manifests are bundled into the app).
@@ -54,6 +60,23 @@ export default defineFeature({
       input: emptyInput,
       handler: lazy('snooze'),
     },
+    {
+      method: 'POST',
+      path: '/occurrences/:id/pill-check',
+      access: { roles: ['patient'] },
+      maxBodyBytes: 3_600_000, // up to 5 photos; checked before parsing
+      input: pillCheckInput,
+      handler: lazy('pillCheck'),
+    },
+    { method: 'GET', path: '/occurrences/:id/frames', access: caregiver, handler: lazy('frames') },
+    {
+      method: 'POST',
+      path: '/occurrences/:id/review',
+      access: caregiver,
+      input: reviewInput,
+      handler: lazy('review'),
+    },
+    { method: 'GET', path: '/audit', access: caregiver, handler: lazy('audit') },
   ],
   nav: [], // screens are dashboard widgets (ui/index.tsx), not separate routes
   permissions: ['reminders.manage', 'reminders.confirm'],
@@ -65,6 +88,11 @@ export default defineFeature({
       name: 'reminders.sweep',
       everyMs: 60_000,
       run: async () => void (await (await import('./runtime')).getService().sweep()),
+    },
+    {
+      name: 'reminders.cleanup-frames', // photos are kept only for review, and never longer than 7 days
+      everyMs: 60 * 60_000,
+      run: async () => void (await (await import('./runtime')).getService().cleanupFrames()),
     },
   ],
   register: ({ bus }) => setBus(bus), // synchronous: no race with the first request

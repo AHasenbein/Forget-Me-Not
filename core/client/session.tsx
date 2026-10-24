@@ -11,14 +11,16 @@ import {
 import type { Role } from '@contracts/circle';
 import { TextScaleContext } from '../design-system/text-scale';
 import { isDemo } from '../config/data-mode';
-import { apiCall, type ApiFn } from './api';
+import { apiCall, ApiError, type ApiFn } from './api';
+import type { QuickAccount } from '../auth/quick-login';
+import { authClient } from './supabase';
 
 /** Demo personas map to the demo tokens the API accepts in demo mode. */
 export const PERSONAS = [
   { id: 'patient', label: 'Patient', role: 'patient' },
   { id: 'caregiver', label: 'Caregiver', role: 'primary_caregiver' },
-  { id: 'daughter', label: 'Daughter', role: 'circle_member' },
-  { id: 'friend', label: 'Friend', role: 'circle_member' },
+  // Circle members (daughter, friend) come back with the friends-family feature; their accounts and the
+  // `demo:daughter` / `demo:friend` tokens still exist, they just have no screen to pick yet.
 ] as const satisfies readonly { id: string; label: string; role: Role }[];
 export type Persona = (typeof PERSONAS)[number]['id'];
 
@@ -28,12 +30,23 @@ export const TEXT_SIZES = [
   { label: 'Extra large', scale: 1.5 },
 ] as const;
 
+/** Live mode: where we are in signing in. */
+export type LiveStatus = 'loading' | 'signed_out' | 'no_access' | 'ready';
+
 interface Session {
   demo: boolean;
   persona: Persona;
-  role: Role;
+  /** Null in live mode until we know who you are. */
+  role: Role | null;
   token: string | null;
+  liveStatus: LiveStatus;
+  email: string | null;
   setPersona(p: Persona): void;
+  signIn(email: string, password: string): Promise<string | null>;
+  /** Dev convenience: pick one of the seeded accounts (needs QUICK_LOGIN=on on the API and EXPO_PUBLIC_QUICK_LOGIN=on here). */
+  quickLogin: boolean;
+  signInAs(account: QuickAccount): Promise<string | null>;
+  signOut(): Promise<void>;
   textScale: number;
   setTextScale(s: number): void;
   api: ApiFn;
@@ -54,6 +67,9 @@ export function SessionProvider({ children }: { children: ReactNode }) {
   const demo = useMemo(() => isDemo(), []);
   const [persona, setPersonaState] = useState<Persona>('caregiver');
   const [textScale, setScaleState] = useState(1);
+  const [liveToken, setLiveToken] = useState<string | null | undefined>(undefined); // undefined = not loaded yet
+  const [email, setEmail] = useState<string | null>(null);
+  const [liveRole, setLiveRole] = useState<Role | null | undefined>(undefined); // undefined = unknown, null = no access
 
   useEffect(() => {
     void load('fmn.persona').then(
@@ -64,6 +80,36 @@ export function SessionProvider({ children }: { children: ReactNode }) {
     );
   }, []);
 
+  // Live: follow the Supabase session (it restores from storage and refreshes tokens by itself).
+  useEffect(() => {
+    if (demo) return;
+    const auth = authClient().auth;
+    void auth.getSession().then(({ data }) => {
+      setLiveToken(data.session?.access_token ?? null);
+      setEmail(data.session?.user.email ?? null);
+    });
+    const { data } = auth.onAuthStateChange((_event, s) => {
+      setLiveToken(s?.access_token ?? null);
+      setEmail(s?.user.email ?? null);
+    });
+    return () => data.subscription.unsubscribe();
+  }, [demo]);
+
+  // Live: ask the API who we are. A valid login with no profile is "no access", not an error screen.
+  useEffect(() => {
+    if (demo || !liveToken) return setLiveRole(liveToken === null ? null : undefined);
+    let alive = true;
+    setLiveRole(undefined);
+    apiCall<{ role: Role }>(liveToken, 'GET', '/api/me')
+      .then((me) => alive && setLiveRole(me.role))
+      .catch(
+        (e) => alive && setLiveRole(e instanceof ApiError && e.status === 401 ? null : undefined),
+      );
+    return () => {
+      alive = false;
+    };
+  }, [demo, liveToken]);
+
   const setPersona = useCallback((p: Persona) => {
     setPersonaState(p);
     save('fmn.persona', p);
@@ -73,16 +119,90 @@ export function SessionProvider({ children }: { children: ReactNode }) {
     save('fmn.textScale', String(v));
   }, []);
 
-  // Live sign-in (Supabase) arrives in Stage 2: until then live mode has no token.
-  const token = demo ? `demo:${persona}` : null;
-  const role = PERSONAS.find((p) => p.id === persona)!.role;
+  const token = demo ? `demo:${persona}` : (liveToken ?? null);
+  const role = demo ? PERSONAS.find((p) => p.id === persona)!.role : (liveRole ?? null);
+  const liveStatus: LiveStatus = demo
+    ? 'ready'
+    : liveToken === undefined
+      ? 'loading'
+      : liveToken === null
+        ? 'signed_out'
+        : liveRole === undefined
+          ? 'loading'
+          : liveRole === null
+            ? 'no_access'
+            : 'ready';
+
+  const signIn = useCallback(async (e: string, password: string) => {
+    const { error } = await authClient().auth.signInWithPassword({ email: e.trim(), password });
+    return error ? 'That email or password isn’t right.' : null; // same message either way: no account hints
+  }, []);
+  const quickLogin = process.env.EXPO_PUBLIC_QUICK_LOGIN === 'on'; // literal access so Expo inlines it
+  const signInAs = useCallback(async (account: QuickAccount) => {
+    try {
+      const s = await apiCall<{ access_token: string; refresh_token: string }>(
+        null,
+        'POST',
+        '/dev/quick-login',
+        { account },
+      );
+      const { error } = await authClient().auth.setSession(s);
+      return error ? 'That didn’t work. Please try again.' : null;
+    } catch (e) {
+      return e instanceof ApiError && e.status === 404
+        ? 'Quick sign-in is not turned on. Use email and password.'
+        : 'I can’t reach the app right now. Please try again in a moment.';
+    }
+  }, []);
+  const signOut = useCallback(async () => {
+    try {
+      // 'local' ends THIS device's session only (a global sign-out would also kick the same account out of
+      // every other tab/phone, and it errors when the session was created by quick login).
+      await authClient().auth.signOut({ scope: 'local' });
+    } catch {
+      /* clear our own state below regardless: the user asked to leave */
+    }
+    setLiveToken(null);
+    setEmail(null);
+  }, []);
+
   const api = useCallback<ApiFn>(
     (method, path, body) => apiCall(token, method, path, body),
     [token],
   );
   const value = useMemo(
-    () => ({ demo, persona, role, token, setPersona, textScale, setTextScale, api }),
-    [demo, persona, role, token, setPersona, textScale, setTextScale, api],
+    () => ({
+      demo,
+      persona,
+      role,
+      token,
+      liveStatus,
+      email,
+      setPersona,
+      signIn,
+      quickLogin,
+      signInAs,
+      signOut,
+      textScale,
+      setTextScale,
+      api,
+    }),
+    [
+      demo,
+      persona,
+      role,
+      token,
+      liveStatus,
+      email,
+      setPersona,
+      signIn,
+      quickLogin,
+      signInAs,
+      signOut,
+      textScale,
+      setTextScale,
+      api,
+    ],
   );
   return (
     <Ctx.Provider value={value}>

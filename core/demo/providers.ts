@@ -1,3 +1,4 @@
+import { createDemoVision } from './vision';
 import { createMockAi } from '../testing/mocks/ai';
 import { createMockLocation } from '../testing/mocks/location';
 import { createMockNotifier } from '../testing/mocks/notifier';
@@ -23,6 +24,7 @@ export function demoProviders(world: DemoWorld): Providers {
   const granted = new Set([world.patient.id, world.caregiver.id, world.daughter.id]);
   return {
     ai: createMockAi({ text: world.scamCall.summary, confidence: world.scamCall.confidence }),
+    vision: createDemoVision(),
     plaid: { listTransactions: async () => world.bills },
     notifier: createMockNotifier(),
     location: createMockLocation({

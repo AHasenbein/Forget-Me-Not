@@ -1,7 +1,7 @@
 import { afterAll, describe } from 'vitest';
 import { serviceClient } from '@core/db';
 import { SupabaseStore } from '../../supabase-store';
-import { storeContract } from './store-contract';
+import { storeContract, storeContractPillCheck } from './store-contract';
 
 /**
  * Runs the SAME contract against a real Supabase project, only when asked:
@@ -17,11 +17,17 @@ async function clean() {
   const db = serviceClient();
   await db.from('reminders_occurrences').delete().like('patient_id', 'ct-%');
   await db.from('reminders_schedules').delete().like('patient_id', 'ct-%');
+  await db.from('reminders_frames').delete().like('patient_id', 'ct-%');
+  await db.from('reminders_audit').delete().like('patient_id', 'ct-%');
 }
 
 if (enabled) {
   afterAll(clean);
   storeContract('SupabaseStore (real project)', async () => {
+    await clean();
+    return new SupabaseStore(serviceClient());
+  });
+  storeContractPillCheck('SupabaseStore (real project)', async () => {
     await clean();
     return new SupabaseStore(serviceClient());
   });

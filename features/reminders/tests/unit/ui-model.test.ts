@@ -6,6 +6,7 @@ import {
   caregiverRows,
   normalizeTime,
   pickPatientFocus,
+  pillCheckBadge,
   patientError,
   type OccurrenceView,
 } from '../../ui/model';
@@ -111,7 +112,7 @@ describe('caregiver view', () => {
     expect(rows.map((r) => r.tone)).toEqual(['danger', 'success', 'neutral']);
     expect(rows[0]).toMatchObject({ needsAttention: true, canMarkDone: true });
     expect(rows[1]!.status).toBe('Done 17:02 by you');
-    expect(caregiverCounts(rows)).toEqual({ done: 1, attention: 1, upcoming: 1 });
+    expect(caregiverCounts(rows)).toEqual({ done: 1, attention: 1, upcoming: 1, review: 0 });
   });
 });
 
@@ -139,5 +140,40 @@ describe('normalizeTime', () => {
     expect(normalizeTime(' 21:30 ')).toBe('21:30');
     expect(normalizeTime('9')).toBe('09:00');
     for (const bad of ['', '25:00', '12:60', 'noon', '8:5']) expect(normalizeTime(bad)).toBeNull();
+  });
+});
+
+describe('pill photo check (caregiver view)', () => {
+  const conf = (
+    verification: 'unverified' | 'pending_review' | 'verified' | 'rejected',
+    extra = {},
+  ) =>
+    occ('pill', 'confirmed', '2026-06-01T12:00:00Z', {
+      confirmation: {
+        at: '2026-06-01T12:01:00Z',
+        by: 'u',
+        method: 'video',
+        verification,
+        ...extra,
+      },
+    });
+  it('labels each state, and only unclear/rejected need a review', () => {
+    expect(pillCheckBadge(conf('verified'))).toEqual({
+      label: 'Photo check passed',
+      tone: 'success',
+    });
+    expect(pillCheckBadge(conf('verified', { reviewedBy: 'c' }))?.label).toBe('Photos approved');
+    expect(pillCheckBadge(conf('pending_review'))?.tone).toBe('warn');
+    expect(pillCheckBadge(conf('rejected'))?.tone).toBe('danger');
+    expect(pillCheckBadge(occ('shower', 'confirmed', '2026-06-01T12:00:00Z'))).toBeNull();
+    const rows = caregiverRows([conf('verified'), conf('pending_review'), conf('rejected')], fmt);
+    expect(rows.map((r) => r.needsReview)).toEqual([false, true, true]);
+    expect(caregiverCounts(rows).review).toBe(2);
+  });
+  it('a pill the caregiver gave in person has no photo badge', () => {
+    const o = occ('pill', 'confirmed', '2026-06-01T12:00:00Z', {
+      confirmation: { at: 'x', by: 'c', method: 'caregiver', verification: 'unverified' },
+    });
+    expect(pillCheckBadge(o)).toBeNull();
   });
 });

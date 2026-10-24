@@ -77,8 +77,19 @@ export function patientError(code: string): string {
   }
 }
 
+export function checkError(code: string): string {
+  // The patient always ends on "thank you": a failed photo check is never her problem.
+  return code === 'offline'
+    ? 'I can’t reach the app right now, but your pill is saved. Thank you!'
+    : 'That’s okay. Thank you!';
+}
+
 export function caregiverError(code: string): string {
   switch (code) {
+    case 'nothing_to_review':
+      return 'That was already reviewed.';
+    case 'no_frames':
+      return 'The photos are no longer stored.';
     case 'offline':
       return 'Can’t reach the server.';
     case 'too_soon':
@@ -99,6 +110,27 @@ export interface CaregiverRow {
   tone: RowTone;
   needsAttention: boolean;
   canMarkDone: boolean;
+  /** Pill photo check result, for confirmed pills. */
+  check: { label: string; tone: RowTone } | null;
+  /** The caregiver must look at the photos (unclear or "does not look taken"). */
+  needsReview: boolean;
+}
+
+export function pillCheckBadge(o: OccurrenceView): { label: string; tone: RowTone } | null {
+  if (o.kind !== 'pill' || o.status !== 'confirmed' || !o.confirmation) return null;
+  switch (o.confirmation.verification) {
+    case 'verified':
+      return {
+        label: o.confirmation.reviewedBy ? 'Photos approved' : 'Photo check passed',
+        tone: 'success',
+      };
+    case 'pending_review':
+      return { label: 'Photos need your review', tone: 'warn' };
+    case 'rejected':
+      return { label: 'Photos look wrong', tone: 'danger' };
+    default:
+      return o.confirmation.method === 'tap' ? { label: 'No photo check', tone: 'neutral' } : null;
+  }
 }
 
 /** Wording for how the confirmation happened: "by Margaret" / "by you". */
@@ -114,7 +146,11 @@ export function caregiverRows(
 ): CaregiverRow[] {
   return [...items].sort(byDue).map((o) => {
     const at = fmt(o.dueAt, o.timeZone);
-    const base = { occurrence: o, needsAttention: false, canMarkDone: false };
+    const check = pillCheckBadge(o);
+    const needsReview =
+      o.confirmation?.verification === 'pending_review' ||
+      o.confirmation?.verification === 'rejected';
+    const base = { occurrence: o, needsAttention: false, canMarkDone: false, check, needsReview };
     switch (o.phase) {
       case 'confirmed':
         return {
@@ -150,6 +186,7 @@ export function caregiverCounts(rows: readonly CaregiverRow[]) {
     done: n((r) => r.occurrence.phase === 'confirmed'),
     attention: n((r) => r.needsAttention),
     upcoming: n((r) => ['upcoming', 'due', 'snoozed'].includes(r.occurrence.phase)),
+    review: n((r) => r.needsReview),
   };
 }
 

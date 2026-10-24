@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { EventBus } from '@core/events/bus';
-import { FakeClock, createLinkedPair, createMockNotifier } from '@core/testing';
+import { FakeClock, createLinkedPair, createMockNotifier, createMockVision } from '@core/testing';
 import { ESCALATE_MIN, MemoryStore, createReminderService } from '../../../features/reminders';
 
 /**
@@ -23,6 +23,7 @@ describe('reminders escalate to the caregiver when unconfirmed', () => {
       store: new MemoryStore(),
       bus,
       notifier: () => patientPush,
+      vision: () => createMockVision(),
       now: clock.now,
     });
     await svc.createSchedule(caregiver, {

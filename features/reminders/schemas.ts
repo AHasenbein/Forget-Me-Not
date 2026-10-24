@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { FRAME_TYPES, type FrameType } from '@core/ai/vision';
 import { isValidTimeZone } from './time';
 
 export const REMINDER_KINDS = ['pill', 'brush_teeth', 'shower', 'feed_pets'] as const;
@@ -38,6 +39,28 @@ export const patchScheduleInput = z
 /** POST bodies may be empty: `{}` is the default, so a bare POST is valid. */
 export const emptyInput = z.object({}).strict().default({});
 
+/** Photos for the pill check: at most 5, each a real JPEG/PNG/WebP (the bytes are re-checked server-side). */
+export const pillCheckInput = z
+  .object({
+    frames: z
+      .array(
+        z
+          .object({
+            mediaType: z.enum(FRAME_TYPES),
+            data: z
+              .string()
+              .min(16)
+              .max(700_000)
+              .regex(/^[A-Za-z0-9+/]+={0,2}$/),
+          })
+          .strict(),
+      )
+      .min(1)
+      .max(5),
+  })
+  .strict();
+export const reviewInput = z.object({ decision: z.enum(['approve', 'reject']) }).strict();
+
 export type CreateScheduleInput = z.infer<typeof createScheduleInput>;
 export type PatchScheduleInput = z.infer<typeof patchScheduleInput>;
 
@@ -63,7 +86,31 @@ export interface Confirmation {
   /** 'video' arrives with the pill-vision step; 'caregiver' = confirmed on the patient's behalf. */
   method: 'tap' | 'video' | 'caregiver';
   /** Tap confirmations stay 'unverified'; the video step will move pills to pending_review/verified/rejected. */
-  verification: 'unverified' | 'pending_review' | 'verified' | 'rejected';
+  verification: Verification;
+  /** Set when a caregiver reviewed the photos. */
+  reviewedBy?: string;
+  reviewedAt?: string;
+}
+export type Verification = 'unverified' | 'pending_review' | 'verified' | 'rejected';
+
+/** Photos kept ONLY while a human needs to review them (never when the check passed). */
+export interface Frame {
+  id: string;
+  occurrenceId: string;
+  patientId: string;
+  mediaType: FrameType;
+  data: string; // base64
+  createdAt: string;
+}
+
+/** Who looked at sensitive things (photos) and who reviewed. Visible to the caregiver. */
+export interface AuditEntry {
+  id: string;
+  at: string;
+  actorId: string;
+  patientId: string;
+  action: 'pill_frames_viewed' | 'pill_check_reviewed';
+  occurrenceId: string;
 }
 
 export interface Occurrence {
