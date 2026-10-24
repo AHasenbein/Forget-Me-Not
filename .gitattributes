@@ -1,0 +1,6 @@
+# Same bytes on Windows and macOS: LF everywhere (prettier, shell hooks and CI all assume it).
+* text=auto eol=lf
+*.sh text eol=lf
+*.png binary
+*.jpg binary
+*.ico binary

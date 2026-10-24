@@ -1,12 +1,26 @@
 # Contributing
 
+## Windows and macOS
+
+Both are supported; CI runs the tests on Windows too. Use **Git Bash or PowerShell** (not cmd.exe) on Windows.
+
+- **Node 24** (npm 11, needed for the lockfile): macOS `brew install fnm`; Windows `winget install Schniz.fnm`
+  (or nvm-windows: `nvm install 24 && nvm use 24`; nvm-windows ignores `.nvmrc`). Then `fnm use` in the repo.
+- Windows git settings (once): `git config --global core.longpaths true`. Line endings are forced to LF by
+  `.gitattributes`; do not set `core.autocrlf=true` overrides in the repo and keep your editor on LF.
+- Use `npm run <script>` for everything (they use cross-env, so no `VAR=x cmd` syntax). Don't paste bash-only
+  one-liners (`rm -rf`, `cp`) into docs or scripts: write a small Node script in `scripts/` instead.
+- **iOS needs a Mac**: Windows has no iOS simulator and can't build iOS locally. The Windows dev tests on an
+  Android emulator/device or the web preview; iOS builds come from EAS in the cloud (needs an Apple developer
+  account) or the Mac dev. Background location/geofencing/push must be verified on a real device per platform.
+
 ## Setup (once)
 
 ```bash
 git clone <repo> && cd Forget-Me-Not
 npm run setup            # npm ci + generated registry + git hooks
-cp .env.example .env
-brew install gitleaks    # optional locally; CI always scans
+                         # setup also creates .env from .env.example if missing
+brew install gitleaks    # optional locally (Windows: winget install gitleaks.gitleaks); CI always scans
 ```
 
 Demo: `npm run dev:demo` (+ `npm run dev:api:demo`) runs everything on canned fictional data, no keys needed.
@@ -28,7 +42,7 @@ location, geofencing or reliable push.
 ## CI
 
 - PR (`ci.yml`): lint + format, typecheck, boundary, unit + integration with coverage, build, `npm audit`
-  (prod deps; blocks on critical, warns on high), gitleaks. Feature-only PRs run only that feature's tests plus architecture/smoke tests;
+  (prod deps; blocks on critical, warns on high), plus a `windows` job (lint, format, typecheck, tests, e2e, generator), gitleaks. Feature-only PRs run only that feature's tests plus architecture/smoke tests;
   touching anything else runs everything.
 - Push to main: `e2e.yml` (also manual) and `deploy.yml` (full CI, then Supabase migrations + EAS Update).
 
@@ -45,7 +59,7 @@ that deploy step with a warning instead of failing.
   - Dismiss stale approvals when new commits are pushed
   - **Require review from Code Owners**
 - Require status checks to pass before merging; **require branches to be up to date**. Required checks:
-  `scope`, `lint`, `typecheck`, `boundary`, `test`, `build`, `audit`, `secrets`
+  `scope`, `lint`, `typecheck`, `boundary`, `test`, `windows`, `build`, `audit`, `secrets`
 - Require conversation resolution before merging
 - Require linear history
 - Do not allow bypassing the above settings; block force pushes and deletions

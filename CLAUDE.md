@@ -38,6 +38,9 @@ weaker SQL/RLS for role+circle permissions, and no TS sharing with the API).
 - **Call recording**: iOS does not allow third-party call recording; Android restricts it by version. Scam-call-guard
   must degrade gracefully (user-initiated recording / voicemail / carrier signals). Behind `CALL_RECORDING_ENABLED`.
 - Camera/video (`expo-camera`) works in a dev build; large uploads must be resumable and size-limited.
+- **Windows + macOS**: both must work. Scripts use cross-env/Node, never bash-only syntax; file paths via `node:path`
+  (use `path.posix` for repo-relative strings); LF line endings (`.gitattributes`). iOS can only be built/simulated
+  on a Mac (or EAS cloud). CI has a `windows` job.
 - No mobile UI e2e in CI yet (Maestro is post-hackathon). API e2e only.
 - **API deploy is not wired yet** (Stage 2): bundle `core/server` + manifests into a Supabase Edge Function.
   deploy.yml ships DB migrations + the app (EAS Update) only. The `dev:api` token verifier is a stub (all 401).
@@ -142,7 +145,7 @@ idempotent actions), survive session expiry without a confusing logout. **Check-
 ## Working agreements for Claude
 
 1. Read this file and `features/<name>/CLAUDE.md` before touching a feature. Stay inside your feature folder.
-2. **Ask before touching `core/` or `contracts/`.** Never add to `tests/architecture/public-routes.allowlist.ts` without asking.
+2. **No bash-only commands in scripts, package.json or docs** (Windows dev). **Ask before touching `core/` or `contracts/`.** Never add to `tests/architecture/public-routes.allowlist.ts` without asking.
 3. Don't build features outside the one you were asked about; don't import other features.
 4. Build against `getProviders()` + demo data first so the feature is demoable from the first commit.
 5. Run `npm run lint && npm run typecheck && npm test` before declaring done. Report failures honestly.
