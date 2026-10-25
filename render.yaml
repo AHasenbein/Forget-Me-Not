@@ -1,0 +1,44 @@
+# Render Blueprint: public DEMO site (fictional household, no real data). Auto-deploys when CI passes on main.
+# Setup: Render dashboard > New > Blueprint > pick this repo. See docs/DEPLOY.md.
+# If the service names below are taken, rename them and update EXPO_PUBLIC_API_URL to match the API's URL.
+services:
+  - type: web
+    name: fmn-api
+    runtime: node
+    plan: free
+    autoDeployTrigger: checksPass
+    healthCheckPath: /health
+    # --include=dev: tsx (runs the TypeScript API) is a devDependency.
+    buildCommand: npm ci --include=dev && npm run gen:registry
+    startCommand: node --import tsx scripts/dev-api.ts
+    envVars:
+      - key: NODE_VERSION
+        value: '24'
+      - key: NODE_ENV
+        value: production
+      - key: DATA_MODE
+        value: demo
+      - key: ALLOW_DEMO_IN_PRODUCTION
+        value: 'true'
+      - key: FEATURE_ALL
+        value: 'on'
+
+  - type: web
+    name: fmn-web
+    runtime: static
+    plan: free
+    autoDeployTrigger: checksPass
+    buildCommand: npm ci --include=dev && npm run build
+    staticPublishPath: dist
+    envVars:
+      - key: NODE_VERSION
+        value: '24'
+      - key: EXPO_PUBLIC_DATA_MODE
+        value: demo
+      - key: EXPO_PUBLIC_API_URL
+        value: https://fmn-api.onrender.com
+    routes:
+      # Single-page app: every path serves index.html so deep links and refresh work.
+      - type: rewrite
+        source: /*
+        destination: /index.html
