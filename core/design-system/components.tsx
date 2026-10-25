@@ -11,7 +11,7 @@ import icon_alert from './icons/alert.png';
 import icon_back from './icons/back.png';
 import icon_camera from './icons/camera.png';
 import icon_flower from './icons/flower.png';
-import { palette, patientUi, radius, shadow, type IconName, type Tone } from './tokens';
+import { font, palette, patientUi, radius, type IconName, type Tone } from './tokens';
 
 /** Multiplier from Settings > Text size. Provided by the shell. */
 import { useTextScale } from './text-scale';
@@ -43,16 +43,16 @@ export function AppText({
           : tone && tone !== 'neutral'
             ? palette[tone]
             : palette.text;
+  const display = variant === 'huge' || variant === 'title';
   // Headlines stop growing at 1.25x: at 1.5x a 40px title swallows a phone screen.
-  const size =
-    SIZE[variant] * (variant === 'huge' || variant === 'title' ? Math.min(scale, 1.25) : scale);
+  const size = SIZE[variant] * (display ? Math.min(scale, 1.25) : scale);
   return (
     <Text
       style={{
         fontSize: size,
-        lineHeight: Math.round(size * 1.3),
+        lineHeight: Math.round(size * (display ? 1.15 : 1.35)),
         color,
-        fontWeight: bold || variant === 'huge' || variant === 'title' ? '700' : '400',
+        ...(display ? font.display : bold ? font.bold : font.body),
         textAlign: center ? 'center' : 'left',
       }}
     >
@@ -73,6 +73,11 @@ export function Screen({ children, wide }: { children: ReactNode; wide?: boolean
   );
 }
 
+/** One per screen: flat deep green, serif headline, white text. No decoration. */
+export function Hero({ children }: { children: ReactNode }) {
+  return <View style={s.hero}>{children}</View>;
+}
+
 const BG: Record<Tone, string> = {
   neutral: palette.card,
   primary: palette.primaryBg,
@@ -80,7 +85,7 @@ const BG: Record<Tone, string> = {
   warn: palette.warnBg,
   danger: palette.dangerBg,
 };
-const EDGE: Record<Tone, string> = {
+const RULE: Record<Tone, string> = {
   neutral: palette.border,
   primary: palette.primary,
   success: palette.success,
@@ -88,29 +93,16 @@ const EDGE: Record<Tone, string> = {
   danger: palette.danger,
 };
 
-/** Brand hero panel: deep green, soft petals, white text. One per screen, carries the greeting/status. */
-export function Hero({ children }: { children: ReactNode }) {
-  return (
-    <View style={s.hero}>
-      <View style={[s.petal, { width: 220, height: 220, right: -60, top: -80, opacity: 0.22 }]} />
-      <View style={[s.petal, { width: 120, height: 120, right: 70, top: -50, opacity: 0.14 }]} />
-      <View style={[s.sun, { right: 16, top: 16 }]} />
-      <View style={{ gap: 14 }}>{children}</View>
-    </View>
-  );
-}
-
-/** Soft raised surface. Tinted tones get a coloured edge so meaning never relies on colour fill alone. */
+/** Flat surface with a hairline. Meaning is carried by a coloured left rule, not by a tinted outline. */
 export function Card({ tone = 'neutral', children }: { tone?: Tone; children: ReactNode }) {
   return (
     <View
       style={[
         s.card,
-        shadow,
         {
           backgroundColor: BG[tone],
-          borderColor: EDGE[tone],
-          borderWidth: tone === 'neutral' ? 1 : 2,
+          borderLeftColor: RULE[tone],
+          borderLeftWidth: tone === 'neutral' ? 1 : 6,
         },
       ]}
     >
@@ -119,12 +111,13 @@ export function Card({ tone = 'neutral', children }: { tone?: Tone; children: Re
   );
 }
 
+/** Status tag: a dot and a word, no pill container. */
 export function Badge({ label, tone = 'neutral' }: { label: string; tone?: Tone }) {
-  const color = tone === 'neutral' ? palette.text : palette[tone];
+  const color = tone === 'neutral' ? palette.muted : palette[tone];
   return (
-    <View style={[s.badge, { backgroundColor: BG[tone], borderColor: EDGE[tone] }]}>
+    <View style={s.badge}>
       <View style={[s.dot, { backgroundColor: color }]} />
-      <Text style={{ color, fontWeight: '700', fontSize: 16 }}>{label}</Text>
+      <Text style={{ color, ...font.bold, fontSize: 16 }}>{label}</Text>
     </View>
   );
 }
@@ -166,20 +159,18 @@ export function BigButton({
       }}
       style={({ pressed }) => [
         s.button,
-        solid ? shadow : null,
         {
           minHeight: size === 'huge' ? 128 : Math.max(patientUi.minTouchTarget, 72),
           backgroundColor: solid ? base : 'transparent',
           borderColor: solid ? base : palette.borderStrong,
-          opacity: off ? 0.5 : 1,
-          transform: [{ scale: pressed ? 0.97 : 1 }],
+          opacity: off ? 0.5 : pressed ? 0.85 : 1,
         },
       ]}
     >
       <Text
         style={{
           fontSize: (size === 'huge' ? 38 : patientUi.minFontSize) * scale,
-          fontWeight: '700',
+          ...font.bold,
           color: solid ? palette.onPrimary : base,
           textAlign: 'center',
         }}
@@ -216,7 +207,7 @@ export function Chip({
       <Text
         style={{
           color: selected ? palette.onPrimary : palette.primary,
-          fontWeight: '700',
+          ...font.bold,
           fontSize: 18,
         }}
       >
@@ -291,7 +282,7 @@ export function Icon({
   );
 }
 
-/** A familiar picture in a soft circle. Always sits next to a text label (pictures alone are ambiguous). */
+/** A plain tinted icon (no circle, no badge): the icon colour carries the tone. Kept under its old name for callers. */
 export function IconCircle({
   icon,
   size = 56,
@@ -301,32 +292,11 @@ export function IconCircle({
   size?: number;
   tone?: Tone;
 }) {
-  return (
-    <View
-      accessibilityElementsHidden
-      importantForAccessibility="no-hide-descendants"
-      style={{
-        width: size,
-        height: size,
-        borderRadius: size / 2,
-        backgroundColor:
-          tone === 'neutral' ? palette.sunken : tone === 'primary' ? BG.primary : palette.card,
-        borderWidth: tone === 'neutral' || tone === 'primary' ? 0 : 2,
-        borderColor: EDGE[tone],
-        alignItems: 'center',
-        justifyContent: 'center',
-      }}
-    >
-      <Icon
-        name={icon}
-        size={size * 0.52}
-        color={tone === 'neutral' || tone === 'primary' ? palette.primary : palette[tone]}
-      />
-    </View>
-  );
+  const color = tone === 'neutral' || tone === 'primary' ? palette.primary : palette[tone];
+  return <Icon name={icon} size={size} color={color} />;
 }
 
-/** Segmented control for sections inside one screen (big, labelled, one always selected). */
+/** Section tabs: text with an underline on the selected one. One is always selected. */
 export function Segmented<T extends string>({
   options,
   value,
@@ -337,7 +307,7 @@ export function Segmented<T extends string>({
   onChange: (id: T) => void;
 }) {
   return (
-    <View style={s.segment} accessibilityRole="tablist">
+    <View style={s.tabs} accessibilityRole="tablist">
       {options.map((o) => {
         const on = o.id === value;
         return (
@@ -346,12 +316,12 @@ export function Segmented<T extends string>({
             accessibilityRole="tab"
             accessibilityState={{ selected: on }}
             onPress={() => onChange(o.id)}
-            style={[s.segmentItem, on && { backgroundColor: palette.card }, on && shadow]}
+            style={[s.tab, { borderBottomColor: on ? palette.primary : 'transparent' }]}
           >
             <Text
               style={{
                 fontSize: 18,
-                fontWeight: '700',
+                ...font.bold,
                 color: on ? palette.primary : palette.muted,
               }}
             >
@@ -364,7 +334,7 @@ export function Segmented<T extends string>({
   );
 }
 
-/** "3 of 5 done" as dots, plain Views (no native deps). */
+/** "3 of 5 done": one short bar segment per reminder. Plain Views, no native deps. */
 export function ProgressDots({
   done,
   total,
@@ -374,34 +344,23 @@ export function ProgressDots({
   total: number;
   inverse?: boolean;
 }) {
+  const on = inverse ? palette.sunflower : palette.success;
+  const off = inverse ? 'rgba(255,255,255,0.28)' : palette.border;
   return (
     <View
       accessible
       accessibilityLabel={`${done} of ${total} done today`}
-      style={{
-        flexDirection: 'row',
-        gap: 8,
-        justifyContent: inverse ? 'flex-start' : 'center',
-        flexWrap: 'wrap',
-      }}
+      style={{ flexDirection: 'row', gap: 4 }}
     >
       {Array.from({ length: total }, (_, i) => (
         <View
           key={i}
           style={{
-            width: 16,
-            height: 16,
-            borderRadius: 8,
-            backgroundColor:
-              i < done ? (inverse ? palette.sunflower : palette.success) : 'transparent',
-            borderWidth: 2,
-            borderColor: inverse
-              ? i < done
-                ? palette.sunflower
-                : '#D4E8DF'
-              : i < done
-                ? palette.success
-                : palette.muted,
+            flex: 1,
+            maxWidth: 64,
+            height: 8,
+            borderRadius: 2,
+            backgroundColor: i < done ? on : off,
           }}
         />
       ))}
@@ -409,42 +368,61 @@ export function ProgressDots({
   );
 }
 
-/** Big number + label for the caregiver summary row. */
-export function StatTile({
-  value,
-  label,
-  tone = 'neutral',
+/** Row of big numbers separated by hairlines (reads like a ledger, not a set of cards). */
+export function Ledger({
+  items,
   inverse,
 }: {
-  value: number;
-  label: string;
-  tone?: Tone;
+  items: readonly { value: number; label: string; tone?: Tone }[];
   inverse?: boolean;
 }) {
   const scale = useTextScale();
-  const color = inverse ? '#FFFFFF' : tone === 'neutral' ? palette.text : palette[tone];
   return (
     <View
-      style={[
-        s.stat,
-        inverse
-          ? {
-              backgroundColor: tone === 'danger' ? palette.danger : palette.heroSoft,
-              borderColor: 'transparent',
-            }
-          : { backgroundColor: BG[tone], borderColor: EDGE[tone] },
-      ]}
+      style={{
+        flexDirection: 'row',
+        borderTopWidth: 1,
+        borderTopColor: inverse ? 'rgba(255,255,255,0.28)' : palette.border,
+        paddingTop: 16,
+      }}
     >
-      <Text style={{ fontSize: 34 * scale, fontWeight: '800', color }}>{value}</Text>
-      <Text
-        style={{
-          fontSize: 16 * scale,
-          color: inverse ? '#E6F2EC' : palette.muted,
-          textAlign: 'center',
-        }}
-      >
-        {label}
-      </Text>
+      {items.map((it, i) => (
+        <View
+          key={it.label}
+          style={{
+            flex: 1,
+            gap: 2,
+            paddingLeft: i === 0 ? 0 : 16,
+            borderLeftWidth: i === 0 ? 0 : 1,
+            borderLeftColor: inverse ? 'rgba(255,255,255,0.28)' : palette.border,
+          }}
+        >
+          <Text
+            style={{
+              ...font.display,
+              fontSize: 40 * Math.min(scale, 1.25),
+              color: inverse
+                ? it.tone === 'danger'
+                  ? '#FFB4BF'
+                  : '#FFFFFF'
+                : it.tone && it.tone !== 'neutral'
+                  ? palette[it.tone]
+                  : palette.text,
+            }}
+          >
+            {it.value}
+          </Text>
+          <Text
+            style={{
+              ...font.body,
+              fontSize: 16 * scale,
+              color: inverse ? '#D4E8DF' : palette.muted,
+            }}
+          >
+            {it.label}
+          </Text>
+        </View>
+      ))}
     </View>
   );
 }
@@ -459,18 +437,22 @@ export const Stack = ({ children, gap = 16 }: { children: ReactNode; gap?: numbe
 );
 
 const s = StyleSheet.create({
-  screen: { padding: 20, alignItems: 'center', flexGrow: 1, paddingBottom: 48 },
-  column: { width: '100%', maxWidth: 720, gap: 20 },
-  card: { borderRadius: radius.lg, padding: 24, gap: 16 },
-  badge: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-    borderWidth: 1.5,
-    borderRadius: radius.pill,
-    paddingHorizontal: 12,
-    paddingVertical: 4,
+  screen: { padding: 20, alignItems: 'center', flexGrow: 1, paddingBottom: 56 },
+  column: { width: '100%', maxWidth: 720, gap: 24 },
+  hero: {
+    backgroundColor: palette.hero,
+    borderRadius: radius.md,
+    padding: 28,
+    gap: 20,
   },
+  card: {
+    borderRadius: radius.sm,
+    borderWidth: 1,
+    borderColor: palette.border,
+    padding: 24,
+    gap: 16,
+  },
+  badge: { flexDirection: 'row', alignItems: 'center', gap: 6 },
   dot: { width: 8, height: 8, borderRadius: 4 },
   button: {
     borderWidth: 2,
@@ -480,9 +462,9 @@ const s = StyleSheet.create({
     justifyContent: 'center',
   },
   chip: {
-    borderWidth: 2,
-    borderRadius: radius.pill,
-    paddingHorizontal: 18,
+    borderWidth: 1.5,
+    borderRadius: radius.sm,
+    paddingHorizontal: 16,
     paddingVertical: 10,
     minHeight: 52,
     justifyContent: 'center',
@@ -493,47 +475,21 @@ const s = StyleSheet.create({
     paddingHorizontal: 14,
     minHeight: 60,
     fontSize: 22,
+    ...font.body,
     backgroundColor: palette.card,
     color: palette.text,
   },
-  hero: {
-    backgroundColor: palette.hero,
-    borderRadius: radius.lg,
-    padding: 28,
-    overflow: 'hidden',
-  },
-  petal: { position: 'absolute', borderRadius: 999, backgroundColor: palette.petal },
-  sun: {
-    position: 'absolute',
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-    backgroundColor: palette.sunflower,
-    opacity: 0.9,
-  },
-  segment: {
+  tabs: {
     flexDirection: 'row',
-    backgroundColor: palette.track,
-    borderRadius: radius.md,
-    padding: 4,
+    borderBottomWidth: 1,
+    borderBottomColor: palette.border,
     gap: 4,
   },
-  segmentItem: {
-    flex: 1,
+  tab: {
     minHeight: 52,
-    borderRadius: radius.md - 4,
-    alignItems: 'center',
+    paddingHorizontal: 14,
     justifyContent: 'center',
-    paddingHorizontal: 8,
-  },
-  stat: {
-    flexGrow: 1,
-    flexBasis: 96,
-    borderWidth: 1.5,
-    borderRadius: radius.md,
-    paddingVertical: 14,
-    paddingHorizontal: 8,
-    alignItems: 'center',
-    gap: 2,
+    borderBottomWidth: 3,
+    marginBottom: -1,
   },
 });

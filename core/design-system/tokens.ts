@@ -36,12 +36,15 @@ export const palette = {
 } as const;
 export type Tone = 'neutral' | 'primary' | 'success' | 'warn' | 'danger';
 
-/** 8pt spacing scale and shared radii/shadow so every screen feels like one product. */
-export const space = { xs: 4, sm: 8, md: 16, lg: 24, xl: 32 } as const;
-export const radius = { sm: 12, md: 20, lg: 28, pill: 999 } as const;
-export const shadow = {
-  boxShadow: '0 2px 10px rgba(22, 32, 28, 0.08)',
-  elevation: 2,
+/** Spacing scale, used unevenly on purpose: tight inside a group, wide around the one thing that matters. */
+export const space = { xs: 4, sm: 8, md: 16, lg: 32, xl: 56 } as const;
+/** Two corner radii only. Full rounding is for small status tags, never for cards or buttons. */
+export const radius = { sm: 6, md: 8, pill: 999 } as const;
+/** System font everywhere; only the weight changes. */
+export const font = {
+  display: { fontWeight: '700' },
+  body: { fontWeight: '400' },
+  bold: { fontWeight: '700' },
 } as const;
 
 /** Names of the bundled icon images (core/design-system/icons/*.png). */

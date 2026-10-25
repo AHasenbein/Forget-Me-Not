@@ -8,7 +8,7 @@ import { useSession } from './session';
 const input = {
   borderWidth: 2,
   borderColor: palette.inputBorder,
-  borderRadius: 12,
+  borderRadius: 6,
   paddingHorizontal: 12,
   minHeight: 64,
   fontSize: 24,
@@ -101,7 +101,7 @@ export function SignIn() {
   return (
     <Screen>
       <Stack gap={12}>
-        <IconCircle icon="flower" size={88} />
+        <IconCircle icon="flower" size={56} />
         <AppText variant="huge">{quickLogin ? 'Who are you?' : 'Welcome back'}</AppText>
         <AppText tone="muted">
           {quickLogin ? 'Tap one to continue.' : 'Sign in to see your day.'}

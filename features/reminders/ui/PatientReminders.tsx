@@ -28,7 +28,7 @@ import { PillCamera } from './PillCamera';
 const BASE = '/api/reminders';
 const Pic = ({ icon }: { icon: IconName }) => (
   <View style={{ alignItems: 'center' }}>
-    <IconCircle icon={icon} size={140} tone="primary" />
+    <IconCircle icon={icon} size={104} tone="primary" />
   </View>
 );
 

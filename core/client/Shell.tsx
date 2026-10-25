@@ -13,7 +13,7 @@ import {
   Segmented,
   Screen,
 } from '../design-system/components';
-import { palette } from '../design-system/tokens';
+import { font, palette } from '../design-system/tokens';
 import { ApiError } from './api';
 import { usePoll } from './hooks';
 import { formatTime } from './format';
@@ -43,10 +43,7 @@ export function TopBar({ hideBrand }: { hideBrand?: boolean } = {}) {
           <View style={{ flex: 1, flexDirection: 'row', alignItems: 'center', gap: 10 }}>
             <Icon name="flower" size={36} />
             {!patient && !hideBrand ? (
-              <Text
-                numberOfLines={1}
-                style={{ fontSize: 18, fontWeight: '700', color: palette.text }}
-              >
+              <Text numberOfLines={1} style={{ fontSize: 18, ...font.bold, color: palette.text }}>
                 Forget Me Not
               </Text>
             ) : null}
@@ -64,7 +61,7 @@ export function TopBar({ hideBrand }: { hideBrand?: boolean } = {}) {
                   minWidth: 64,
                   alignItems: 'center',
                   justifyContent: 'center',
-                  borderRadius: 32,
+                  borderRadius: 8,
                   backgroundColor: palette.card,
                   borderWidth: 1,
                   borderColor: palette.border,
@@ -73,7 +70,7 @@ export function TopBar({ hideBrand }: { hideBrand?: boolean } = {}) {
               >
                 <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
                   <Icon name={onSettings ? 'back' : 'sliders'} size={26} />
-                  <Text style={{ fontSize: 24, fontWeight: '700', color: palette.text }}>
+                  <Text style={{ fontSize: 24, ...font.bold, color: palette.text }}>
                     {onSettings ? 'Back' : 'Settings'}
                   </Text>
                 </View>
@@ -130,8 +127,8 @@ export function BottomNav() {
                 style={{
                   paddingHorizontal: 24,
                   paddingVertical: 6,
-                  borderRadius: 999,
-                  backgroundColor: on ? palette.primaryBg : 'transparent',
+                  borderTopWidth: 3,
+                  borderTopColor: on ? palette.primary : 'transparent',
                   alignItems: 'center',
                 }}
               >
@@ -139,7 +136,7 @@ export function BottomNav() {
                 <Text
                   style={{
                     fontSize: 16,
-                    fontWeight: '700',
+                    ...font.bold,
                     color: on ? palette.primary : palette.muted,
                   }}
                 >
@@ -169,9 +166,7 @@ function Sidebar() {
     >
       <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10, marginBottom: 24 }}>
         <Icon name="flower" size={40} />
-        <Text style={{ fontSize: 20, fontWeight: '800', color: '#FFFFFF', flex: 1 }}>
-          Forget Me Not
-        </Text>
+        <Text style={{ fontSize: 20, ...font.bold, color: '#FFFFFF', flex: 1 }}>Forget Me Not</Text>
       </View>
       {NAV.map((n) => {
         const on = n.href === '/' ? path === '/' : path.startsWith(n.href);
@@ -186,12 +181,12 @@ function Sidebar() {
                 alignItems: 'center',
                 gap: 14,
                 paddingHorizontal: 16,
-                borderRadius: 16,
+                borderRadius: 6,
                 backgroundColor: on ? 'rgba(255,255,255,0.16)' : 'transparent',
               }}
             >
               <Icon name={n.icon} size={26} color="#FFFFFF" />
-              <Text style={{ fontSize: 20, fontWeight: '700', color: '#FFFFFF' }}>{n.label}</Text>
+              <Text style={{ fontSize: 20, ...font.bold, color: '#FFFFFF' }}>{n.label}</Text>
             </Pressable>
           </Link>
         );
