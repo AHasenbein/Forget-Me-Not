@@ -16,12 +16,13 @@ export function FindMap({
   them,
   heading,
 }: {
-  g: FindGuide;
+  /** Null when your own position is not known yet: the map then shows only them, in the centre. */
+  g: FindGuide | null;
   them: Point;
   heading: number | null;
 }) {
-  const ring = mapRingM(g.distanceM);
-  const o = mapOffsetPx(g, R, ring);
+  const ring = g ? mapRingM(g.distanceM) : 50;
+  const o = g ? mapOffsetPx(g, R, ring) : { x: 0, y: 0 };
   const acc = accuracyPx(them.accuracyM, R, ring);
   const label = ring >= 1000 ? `${ring / 1000} km` : `${ring} m`;
   const dot = 18;
@@ -103,23 +104,26 @@ export function FindMap({
           }}
         />
         {/* you */}
-        <View
-          style={{
-            position: 'absolute',
-            left: R - dot / 2,
-            top: R - dot / 2,
-            width: dot,
-            height: dot,
-            borderRadius: dot / 2,
-            backgroundColor: palette.primary,
-            borderWidth: 3,
-            borderColor: '#fff',
-          }}
-        />
+        {g ? (
+          <View
+            style={{
+              position: 'absolute',
+              left: R - dot / 2,
+              top: R - dot / 2,
+              width: dot,
+              height: dot,
+              borderRadius: dot / 2,
+              backgroundColor: palette.primary,
+              borderWidth: 3,
+              borderColor: '#fff',
+            }}
+          />
+        ) : null}
       </View>
       <AppText variant="small" tone="muted">
-        Green is you, red is them. Outer ring is {label}.
-        {heading === null ? ' Up is north.' : ' Up is the way you are facing.'}
+        {g
+          ? `Green is you, red is them. Outer ring is ${label}.${heading === null ? ' Up is north.' : ' Up is the way you are facing.'}`
+          : 'Red is them. Allow location for this page to see yourself on the map.'}
       </AppText>
     </View>
   );

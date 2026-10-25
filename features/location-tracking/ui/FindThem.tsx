@@ -127,7 +127,6 @@ export function FindThem() {
             <Text style={{ fontSize: 96, lineHeight: 104, color: palette.primary }}>⬆</Text>
           </View>
           <AppText>{findLine(g, heading !== null, ageSec)}</AppText>
-          {me && them ? <FindMap g={g} them={them} heading={heading} /> : null}
           {heading === null ? (
             <AppText variant="small" tone="muted">
               No compass on this device, so up on the screen is north. Use the words above.
@@ -139,6 +138,7 @@ export function FindThem() {
           {them ? 'Finding your own position…' : 'Waiting for their phone to report…'}
         </AppText>
       )}
+      {them ? <FindMap g={g} them={them} heading={heading} /> : null}
       {problem ? <AppText tone="danger">{problem}</AppText> : null}
       <View style={{ borderTopWidth: 1, borderTopColor: palette.border, width: '100%' }} />
       <BigButton tone="ghost" label="Stop" onPress={stop} />
