@@ -119,3 +119,8 @@ export const ARM_MS = 5_000;
 export function clearedLine(c: { note: string | null; at: string }, fmt: (iso: string) => string) {
   return `Cleared automatically at ${fmt(c.at)}: “${c.note ?? 'a payment'}”`;
 }
+
+/** "This looks OK" stays this long, then clears itself. */
+export const LOOKS_OK_MS = 5_000;
+/** A tap clears it only after it has been up this long, so a stray or repeated tap cannot hide it before it is read. */
+export const LOOKS_OK_TAP_AFTER_MS = 1_000;

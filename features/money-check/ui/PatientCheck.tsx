@@ -1,11 +1,19 @@
-import { useState } from 'react';
-import { View } from 'react-native';
+import { useEffect, useState } from 'react';
+import { Pressable, View } from 'react-native';
 import { ApiError } from '@core/client/api';
 import { useSession } from '@core/client/session';
 import { AppText, BigButton, Card, Field, Icon } from '@core/design-system/components';
 import { palette } from '@core/design-system/tokens';
 import type { PatientStatus, Reason } from '../schemas';
-import { NOTE_MAX, noteReady, patientError, patientReason, patientStatusText } from './model';
+import {
+  LOOKS_OK_MS,
+  LOOKS_OK_TAP_AFTER_MS,
+  NOTE_MAX,
+  noteReady,
+  patientError,
+  patientReason,
+  patientStatusText,
+} from './model';
 import { useRequest } from './useRequest';
 
 const BASE = '/api/money-check';
@@ -24,7 +32,23 @@ export function PatientCheck() {
   const [busy, setBusy] = useState(false);
   const [note, setNote] = useState('');
   const [problem, setProblem] = useState('');
-  const request = data?.request ?? null;
+  const current = data?.request ?? null;
+
+  // "This looks OK" clears itself after 5 s; a tap clears it, but only once it has been up for 1 s.
+  const okId = current?.status === 'looks_ok' ? current.id : null;
+  const [hiddenId, setHiddenId] = useState<string | null>(null);
+  const [tappable, setTappable] = useState(false);
+  useEffect(() => {
+    setTappable(false);
+    if (!okId) return;
+    const canTap = setTimeout(() => setTappable(true), LOOKS_OK_TAP_AFTER_MS);
+    const hide = setTimeout(() => setHiddenId(okId), LOOKS_OK_MS);
+    return () => {
+      clearTimeout(canTap);
+      clearTimeout(hide);
+    };
+  }, [okId]);
+  const request = okId && hiddenId === okId ? null : current;
 
   const ask = async () => {
     if (busy || !noteReady(note)) return;
@@ -48,28 +72,36 @@ export function PatientCheck() {
   return (
     <View style={{ width: '100%', maxWidth: 640, alignSelf: 'center', gap: 12 }}>
       {request && text ? (
-        <Card
-          tone={request.status === 'ok_to_go' || request.status === 'looks_ok' ? 'success' : 'warn'}
+        <Pressable
+          accessibilityRole={tappable ? 'button' : undefined}
+          accessibilityLabel={tappable ? 'Close this message' : undefined}
+          onPress={() => tappable && okId && setHiddenId(okId)}
         >
-          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 14 }}>
-            <Icon
-              name={
-                request.status === 'ok_to_go' || request.status === 'looks_ok' ? 'check' : 'alert'
-              }
-              size={44}
-              color={
-                request.status === 'ok_to_go' || request.status === 'looks_ok'
-                  ? palette.success
-                  : palette.warn
-              }
-            />
-            <View style={{ flex: 1 }}>
-              <AppText variant="title">{text.title}</AppText>
+          <Card
+            tone={
+              request.status === 'ok_to_go' || request.status === 'looks_ok' ? 'success' : 'warn'
+            }
+          >
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 14 }}>
+              <Icon
+                name={
+                  request.status === 'ok_to_go' || request.status === 'looks_ok' ? 'check' : 'alert'
+                }
+                size={44}
+                color={
+                  request.status === 'ok_to_go' || request.status === 'looks_ok'
+                    ? palette.success
+                    : palette.warn
+                }
+              />
+              <View style={{ flex: 1 }}>
+                <AppText variant="title">{text.title}</AppText>
+              </View>
             </View>
-          </View>
-          <AppText>{text.body}</AppText>
-          {why ? <AppText tone="muted">{why}</AppText> : null}
-        </Card>
+            <AppText>{text.body}</AppText>
+            {why ? <AppText tone="muted">{why}</AppText> : null}
+          </Card>
+        </Pressable>
       ) : open ? (
         <Card>
           <AppText variant="title">What is the payment for?</AppText>

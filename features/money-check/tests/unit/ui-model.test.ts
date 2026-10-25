@@ -40,6 +40,14 @@ describe('patient wording', () => {
   });
 });
 
+describe('looks-OK timing', () => {
+  it('stays 5 s, and a tap only counts after 1 s', async () => {
+    const { LOOKS_OK_MS, LOOKS_OK_TAP_AFTER_MS } = await import('../../ui/model');
+    expect(LOOKS_OK_MS).toBe(5000);
+    expect(LOOKS_OK_TAP_AFTER_MS).toBe(1000);
+  });
+});
+
 describe('caregiver wording', () => {
   it('has an explanation for every reason', () => {
     for (const r of REASONS) expect(caregiverReason(r).length).toBeGreaterThan(10);
