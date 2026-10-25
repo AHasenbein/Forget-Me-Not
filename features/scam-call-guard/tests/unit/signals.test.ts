@@ -46,6 +46,16 @@ describe('scam rules', () => {
     expect(level(`${base} There is a one-time fee first.`)).toBe('danger');
   });
 
+  it('flags any mention of Social Security as danger straight away', () => {
+    for (const t of [
+      'Hello, I am calling about your Social Security.',
+      'This is the social-security office.',
+      'We need your SSN.',
+      'This is the SSA calling.',
+    ])
+      expect(level(t), t).toBe('danger');
+  });
+
   it('keeps weak signals alone quiet (a real bank may say these too)', () => {
     expect(level('We noticed a suspicious charge on your card.')).toBe('none');
     expect(level('Please verify your date of birth.')).toBe('none');

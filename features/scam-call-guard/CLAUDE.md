@@ -48,7 +48,8 @@ and press Start recording as the patient (Chrome/Edge: browser speech-to-text; e
 The AI comes from `getProviders().ai`. Demo (no key): `core/demo/ai.ts` reads the transcript for scam cues, not a real model.
 Live: `DATA_MODE_AI=live` + `OPENROUTER_API_KEY` (optional `OPENROUTER_MODEL`) uses the OpenRouter text adapter in `core/ai`.
 That adapter reports `confidence: 1`, so the model's OWN confidence is read from the JSON we ask for
-(`{verdict, summary, confidence}`); the lower of the two wins. The first AI check runs after ~120 characters, then every ~400.
+(`{verdict, summary, confidence}`); the lower of the two wins. The first AI check runs after ~40 characters (one sentence), then every ~400. Any mention of Social Security
+(`social_security` rule) is danger on its own.
 
 ## Rules (signals.ts)
 
