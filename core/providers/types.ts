@@ -19,7 +19,7 @@ export interface PlaidPort {
 /** Everything a feature talks to outside itself. Features get these injected, never import adapters. */
 export interface Providers {
   ai: AiClient;
-  /** Photo checks (e.g. pill taken). Own switch: DATA_MODE_VISION (live needs AI_API_KEY). */
+  /** Photo checks (e.g. pill taken). Own switch: DATA_MODE_VISION (live needs OPENROUTER_API_KEY). */
   vision: VisionClient;
   plaid: PlaidPort;
   notifier: Notifier;
