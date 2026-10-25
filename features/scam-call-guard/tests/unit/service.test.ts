@@ -255,8 +255,45 @@ describe('scam-call-guard service', () => {
     expect(t.ai.calls).toHaveLength(0);
     await t.svc.addSegment(patient, call.id, { seq: 1, text: 'b'.repeat(30) });
     expect(t.ai.calls).toHaveLength(1);
-    await t.svc.addSegment(patient, call.id, { seq: 2, text: 'c'.repeat(200) });
-    expect(t.ai.calls).toHaveLength(1); // not again until ~400 more characters
+    await t.svc.addSegment(patient, call.id, { seq: 2, text: 'c'.repeat(80) });
+    expect(t.ai.calls).toHaveLength(2); // the opening was too short to judge: asked again past ~120 characters
+    await t.svc.addSegment(patient, call.id, { seq: 3, text: 'd'.repeat(200) });
+    expect(t.ai.calls).toHaveLength(2); // not again until ~400 more characters
+  });
+
+  it('an unsure answer on the opening greeting asks again later instead of flagging; at hang-up it flags', async () => {
+    const ai = createMockAi({
+      text: '{"verdict":"unclear","summary":"Too short to tell.","confidence":0.5}',
+      confidence: 1,
+    });
+    const t = setup({ ai });
+    const { call } = await t.svc.start(patient);
+    await t.svc.addSegment(patient, call.id, {
+      seq: 0,
+      text: 'Hi there, how are you doing today, my friend?',
+    });
+    await t.svc.addSegment(patient, call.id, {
+      seq: 1,
+      text: 'Lovely weather we are having this week, isn’t it?',
+    });
+    expect(ai.calls).toHaveLength(2); // asked again after the next sentence
+    expect(t.svc.detail(caregiver, call.id).call.needsReview).toBe(false);
+    await t.svc.end(patient, call.id);
+    expect(t.svc.detail(caregiver, call.id).call.needsReview).toBe(true); // the final check keeps the rule
+  });
+
+  it('a confident "scam" on the opening greeting still warns at once', async () => {
+    const ai = createMockAi({
+      text: '{"verdict":"scam","summary":"Impersonation.","confidence":0.95}',
+      confidence: 1,
+    });
+    const t = setup({ ai });
+    const { call } = await t.svc.start(patient);
+    const r = await t.svc.addSegment(patient, call.id, {
+      seq: 0,
+      text: 'Hello dear, this is the pension office calling.',
+    });
+    expect(r.call.warning).toBe('danger');
   });
 
   it('caregiver can mark a false alarm; patient and other patients cannot see it', async () => {

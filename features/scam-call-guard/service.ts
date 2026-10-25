@@ -8,6 +8,7 @@ import { AI_TASK, buildContent, parseVerdict } from './analyzer';
 import {
   AI_DANGER_CONFIDENCE,
   AI_TIMEOUT_MS,
+  AI_SETTLE_CHARS,
   ANALYZE_EVERY_CHARS,
   ANALYZE_FIRST_CHARS,
   IDLE_END_MS,
@@ -86,7 +87,7 @@ export function createScamCallGuardService(deps: ScamCallGuardDeps) {
   });
 
   /** One AI assessment of the in-memory window. Never throws; the AI can raise the warning but never lower it. */
-  async function analyse(c: Call) {
+  async function analyse(c: Call, final = false) {
     const text = windows.get(c.id);
     if (!text || analysing.has(c.id)) return;
     analysing.add(c.id);
@@ -106,7 +107,10 @@ export function createScamCallGuardService(deps: ScamCallGuardDeps) {
       c.aiVerdict = v.verdict;
       c.aiConfidence = confidence;
       c.summary = v.summary || c.summary;
-      if (v.verdict === 'unparsed' || v.verdict === 'unclear' || confidence < LOW_CONFIDENCE)
+      // The opening greeting is too short to judge: unsure there just means "ask again after the next sentence".
+      const settling = !final && text.length < AI_SETTLE_CHARS;
+      if (settling && v.verdict !== 'scam' && v.verdict !== 'unparsed') c.aiVerdict = null;
+      else if (v.verdict === 'unparsed' || v.verdict === 'unclear' || confidence < LOW_CONFIDENCE)
         c.needsReview = true;
       if (v.verdict === 'scam' && confidence >= LOW_CONFIDENCE)
         c.level = maxLevel(c.level, confidence >= AI_DANGER_CONFIDENCE ? 'danger' : 'caution');
@@ -160,7 +164,7 @@ export function createScamCallGuardService(deps: ScamCallGuardDeps) {
 
   async function finalise(c: Call) {
     if (c.status === 'ended') return;
-    if (windows.has(c.id)) await analyse(c); // final overview from the whole window
+    if (windows.has(c.id)) await analyse(c, true); // final overview from the whole window
     c.status = 'ended';
     c.endedAt = now().toISOString();
     windows.delete(c.id);

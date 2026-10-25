@@ -2,6 +2,11 @@ const MIN = 60_000;
 
 /** The AI is asked from the first sentence (a scam is best caught in the opening lines); later checks wait for more speech. */
 export const ANALYZE_FIRST_CHARS = 40;
+/**
+ * Below this much call text an "unclear" or low-confidence answer means "too short to tell yet": the AI is asked again
+ * after the next sentence instead of flagging the call for review. From here on (and at hang-up) the review rule applies.
+ */
+export const AI_SETTLE_CHARS = 120;
 /** New transcript characters needed before the AI is asked again (rules run on every segment; the AI is the slow, costly part). */
 export const ANALYZE_EVERY_CHARS = 400;
 /** The AI must answer inside this window or the segment response goes out on the rules alone. */
