@@ -11,3 +11,6 @@ export const readingSchema = z.object({
 
 /** Body of POST /readings. A `patientId` here is stripped by zod: identity comes from the session. */
 export const ingestSchema = z.object({ readings: z.array(readingSchema).min(1).max(MAX_BATCH) });
+
+/** Body of POST /find and /find/stop: nothing to send. Identity and patient come from the session. */
+export const emptySchema = z.object({});

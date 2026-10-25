@@ -30,6 +30,7 @@ const WHO: Record<string, string> = {
   caregiver_view: 'Caregiver',
   circle_view: 'Family member',
   lost_button: 'Lost-button alert',
+  find_session: 'Started a find-them session',
   safezone_eval: 'Safe-zone check',
 };
 

@@ -16,6 +16,10 @@ Routes (`/api/location-tracking`):
 - `POST /readings` (patient): batch of readings (offline queue flush). `patientId` comes from the session, never the body.
 - `GET /location` (primary_caregiver, circle_member with `view_location`): `{ location: LocationReading | null }`.
   Handlers cannot return 403/404 (core limitation), so unlinked or ungranted callers get `{ location: null }`.
+- `POST /find` (primary_caregiver) starts a 10-minute "find them" session; `POST /find/stop` (caregiver or patient) ends it at once;
+  `GET /find` (caregiver, patient) says whether it is on. The start is audited once (`find_session`); the caregiver's follow-up
+  location reads during the session are not, so the "who looked" list stays readable. Circle members can never start one.
+  Sessions live in memory and end by the server clock.
 - `GET /views` (primary_caregiver): audit log of who viewed the location and when (no coordinates).
 
 Contract: implements `LocationReadContract` (`server/service.ts`, `createLocationService`). Not yet registered
@@ -90,3 +94,15 @@ Until the Supabase adapter lands, the in-memory store in `server/store.ts` is th
 - Wire the device tracker into the app shell (shared change, agree with the other dev; needs a dev build).
 - Patient "sharing your location" status once the tracker runs.
 - A map view: needs a decision on a tile provider (privacy: tiles reveal the area) or a native map SDK (new EAS build).
+
+## Find them (precise + arrow)
+
+- Patient widget polls `GET /find` every 5 s. While a session is on it says "Your family is finding you." with a "Stop sharing"
+  button, and (web) switches to high-accuracy reports about every 3 s (`createFastWebTracker`, in memory only, nothing queued).
+  Back to the 5-minute cadence when it ends. Native phones are told but do not yet switch to precise mode (needs a dev build).
+- Caregiver `FindThem` (inside the Location card): own position + compass stay on the caregiver's device and are never sent.
+  `ui/find.ts` (pure, tested) gives distance, bearing and the arrow rotation. With no compass the arrow points north and the
+  words say "Head north-east". Inside the combined GPS uncertainty it says "very close, look around" instead of a false arrow.
+- Compass: iOS needs a tap for motion permission (done in the Find button); desktop browsers have none. Needs HTTPS on phones
+  for geolocation/compass (localhost is fine on the same machine; a LAN IP over http is not).
+- Edge cases: stale patient position is shown with its age; patient revokes at any time; session expiry ends it server-side.
