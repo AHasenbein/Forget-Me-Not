@@ -26,6 +26,11 @@ export function patientStatusText(status: PatientStatus): { title: string; body:
   switch (status) {
     case 'ok_to_go':
       return { title: 'Your caregiver says this is OK', body: 'You can go ahead.' };
+    case 'looks_ok':
+      return {
+        title: 'This looks OK',
+        body: 'You can go ahead. Your caregiver can see it too.',
+      };
     case 'dont_pay':
       return {
         title: 'Please don’t pay',
@@ -65,6 +70,8 @@ export function caregiverReason(r: Reason): string {
       return 'The bill is larger than usual. Compare it with the paper bill.';
     case 'known_bill':
       return 'This matches an unpaid bill at the bank.';
+    case 'everyday_purchase':
+      return 'This sounds like an everyday purchase.';
     case 'looks_like_scam':
       return 'An automatic check thinks this could be a scam. It is only a hint: you decide.';
     case 'unclear_purpose':
@@ -107,3 +114,8 @@ export function caregiverError(code: string): string {
 export const POLL_MS = 5_000;
 /** How long the "tap again to approve" state lasts, so a stray later tap cannot approve a payment. */
 export const ARM_MS = 5_000;
+
+/** One muted caregiver line for something the check let through on its own. */
+export function clearedLine(c: { note: string | null; at: string }, fmt: (iso: string) => string) {
+  return `Cleared automatically at ${fmt(c.at)}: “${c.note ?? 'a payment'}”`;
+}

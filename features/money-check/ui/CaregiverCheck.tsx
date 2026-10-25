@@ -10,6 +10,7 @@ import type { MoneyRequest } from '../schemas';
 import {
   ARM_MS,
   caregiverError,
+  clearedLine,
   caregiverReason,
   dollars,
   kindLabel,
@@ -22,6 +23,7 @@ const BASE = '/api/money-check';
 interface Active {
   request: MoneyRequest | null;
   bill: BankTransaction | null;
+  cleared?: { note: string | null; at: string }[];
 }
 
 /** Caregiver: renders NOTHING until the patient asks. Then the verdict, the reasons, and two buttons. */
@@ -38,7 +40,22 @@ export function CaregiverCheck() {
     const t = setTimeout(() => setArmed(false), ARM_MS);
     return () => clearTimeout(t);
   }, [armed]);
-  if (!r) return null;
+  if (!r) {
+    const cleared = data?.cleared ?? [];
+    if (cleared.length === 0) return null;
+    return (
+      <Card>
+        <AppText variant="small" bold>
+          Payments the check let through
+        </AppText>
+        {cleared.map((c) => (
+          <AppText key={c.at} variant="small" tone="muted">
+            {clearedLine(c, formatTime)}
+          </AppText>
+        ))}
+      </Card>
+    );
+  }
 
   const decide = async (decision: 'approve' | 'decline') => {
     if (busy) return;
@@ -75,6 +92,11 @@ export function CaregiverCheck() {
             They wrote:
           </AppText>
           <AppText>“{r.note}”</AppText>
+          <AppText variant="small" tone="muted">
+            {r.aiChecked
+              ? 'An AI also looked at this.'
+              : 'The AI check was not available, so only simple rules were used.'}
+          </AppText>
         </View>
       ) : null}
       {bill ? (

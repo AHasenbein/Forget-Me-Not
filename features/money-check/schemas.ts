@@ -27,10 +27,12 @@ export const REASONS = [
   'looks_like_scam',
   'unclear_purpose',
   'ai_unsure',
+  'everyday_purchase',
 ] as const;
 export type Reason = (typeof REASONS)[number];
 
-export type RequestStatus = 'pending' | 'approved' | 'declined';
+/** `cleared` = auto-cleared as an ordinary everyday payment (rules AND the AI agreed); no caregiver decision. */
+export type RequestStatus = 'pending' | 'approved' | 'declined' | 'cleared';
 
 /**
  * No payee or amount: a bill is referenced by id and looked up when the caregiver views it. The one piece of free text is
@@ -45,6 +47,8 @@ export interface MoneyRequest {
   reasons: Reason[];
   billId: string | null;
   note: string | null;
+  /** True when a model gave a usable second opinion on the note. Shown to the caregiver so nobody assumes an AI looked when it did not. */
+  aiChecked: boolean;
   createdAt: string;
   expiresAt: string;
   status: RequestStatus;
@@ -56,11 +60,11 @@ export interface MoneyRequest {
 }
 
 /** What the patient is told. */
-export type PatientStatus = 'waiting' | 'no_one_reachable' | 'ok_to_go' | 'dont_pay';
+export type PatientStatus = 'waiting' | 'no_one_reachable' | 'ok_to_go' | 'looks_ok' | 'dont_pay';
 
 export interface AuditEntry {
   at: string;
   requestId: string;
-  action: 'created' | 'approved' | 'declined' | 'expired';
+  action: 'created' | 'approved' | 'declined' | 'expired' | 'auto_cleared';
   by: string | null;
 }

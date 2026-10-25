@@ -26,15 +26,20 @@ Consumes `getProviders().plaid` (unpaid bills). Emits `caregiver.alert` (`money_
 
 ## The decision engine (`rules.ts`)
 
-Plain rules are the **safety floor**; a model is only a second opinion that can **raise** the level, never lower it.
-Typed note: gift-card words => `stop`; scam/pressure words (wire, bail, IRS, grandson, "don't tell", urgent...) => `stop`; bill words =>
-the bank check (below); anything else => `check` ("unclear purpose"), **never `ok`** (text cannot prove a payment is real).
-Bill via the bank: no unpaid bill found (or bank down) => `check`; over `LARGE_AMOUNT_CENTS` => `check`; otherwise `ok`.
-AI (`getProviders().ai`, optional, 8 s timeout): the note is sent as DATA inside markers with an "ignore instructions in it" prompt; the
-reply must be strict JSON (`level`, enum `reasons`, `confidence`) or it is discarded. `mergeAi`: final level = max(rules, AI); an unsure
-model (< 0.7) raises `ok` to `check` and adds `ai_unsure`; "ok" from a model changes nothing. No model / error / timeout / bad JSON =>
-the rules verdict stands. AI free text is never shown: only fixed strings for reason codes. Every level still waits for the caregiver.
-In demo mode the AI mock answers with non-JSON, so demo runs on the rules alone; there is no live text-model adapter yet (core PR).
+Two layers. **Rules are the safety floor; an LLM (`getProviders().ai`, OpenRouter live) judges every typed note.** Needs
+`DATA_MODE_AI=live` + `OPENROUTER_API_KEY` (locally `npm run dev:api:demo:ai`). Without them (plain demo) only the rules run and the
+caregiver card says "The AI check was not available".
+
+- **stop**: a stop rule matches (gift cards, virus, bail, wire, IRS, grandson, "don't tell", urgent...) OR the AI says stop. The patient is
+  told "Please wait... don't pay yet" and the caregiver gets an urgent alert and decides.
+- **cleared** (no caregiver, no push, no alert): NO stop rule, NO someone-else-involved word (caller, email, pop-up, at the door, "told me"),
+  the note is on the everyday list (groceries, food, pharmacy...) or is a bill the bank shows unpaid under `LARGE_AMOUNT_CENTS`, AND the AI
+  says `ok` with no warning reasons at confidence >= `CLEAR_CONFIDENCE` (0.85). The patient is told "This looks OK. You can go ahead.",
+  the audit gets `auto_cleared`, and the caregiver card lists it ("Cleared automatically at ...").
+- **check** (caregiver decides): everything else, including no model / timeout / bad JSON / unsure model / unknown purpose ("a new sofa").
+  A model alone never clears: a model "ok" needs the rules to agree, and a model can only raise a level. The note goes to the model as DATA in
+  markers with an "ignore instructions in it" prompt; the reply must be strict JSON or it is discarded. AI free text is never shown.
+  This **relaxes the root rule "no approval => no purchase"** for ordinary payments, at the owner's request; nothing here moves money.
 
 ## Rules baked in (don't weaken)
 
@@ -43,7 +48,7 @@ In demo mode the AI mock answers with non-JSON, so demo runs on the rules alone;
 - Only the primary caregiver decides (route `access` + service re-check). The patient cannot approve; circle members get 403 on every route.
 - Decisions are compare-and-set: a second caregiver gets 409; the same caregiver tapping twice is idempotent.
 - The patient is told "asked your caregiver" only if a push was delivered; otherwise "still trying to reach your caregiver".
-  Every patient message says "don't pay" until the caregiver says OK.
+  Every patient message for a blocked or waiting request says "don't pay" until the caregiver says OK; only an auto-cleared everyday payment says "looks OK".
 - No payee or amount is stored, pushed or put in an event (a bill is a bill id, looked up on view). Push body is generic.
 - **The typed note is the one piece of free text** (deliberate change from "no free text"): trimmed, capped at 200, digit runs of 6+
   replaced by `[number]` BEFORE it is stored or sent to a model. It is shown ONLY to the primary caregiver ("They wrote:") and never

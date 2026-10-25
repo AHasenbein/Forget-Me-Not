@@ -48,12 +48,20 @@ export function PatientCheck() {
   return (
     <View style={{ width: '100%', maxWidth: 640, alignSelf: 'center', gap: 12 }}>
       {request && text ? (
-        <Card tone={request.status === 'ok_to_go' ? 'success' : 'warn'}>
+        <Card
+          tone={request.status === 'ok_to_go' || request.status === 'looks_ok' ? 'success' : 'warn'}
+        >
           <View style={{ flexDirection: 'row', alignItems: 'center', gap: 14 }}>
             <Icon
-              name={request.status === 'ok_to_go' ? 'check' : 'alert'}
+              name={
+                request.status === 'ok_to_go' || request.status === 'looks_ok' ? 'check' : 'alert'
+              }
               size={44}
-              color={request.status === 'ok_to_go' ? palette.success : palette.warn}
+              color={
+                request.status === 'ok_to_go' || request.status === 'looks_ok'
+                  ? palette.success
+                  : palette.warn
+              }
             />
             <View style={{ flex: 1 }}>
               <AppText variant="title">{text.title}</AppText>

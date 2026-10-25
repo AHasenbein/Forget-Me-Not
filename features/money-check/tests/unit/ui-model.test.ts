@@ -19,10 +19,13 @@ describe('patient wording', () => {
     for (const s of ['waiting', 'no_one_reachable', 'dont_pay'] as const)
       expect(JSON.stringify(patientStatusText(s))).toMatch(/don.t pay/i);
     expect(patientStatusText('ok_to_go').title).toMatch(/caregiver says/i);
+    // an auto-cleared payment must NOT claim the caregiver said so
+    expect(JSON.stringify(patientStatusText('looks_ok'))).not.toMatch(/caregiver says|don.t pay/i);
+    expect(patientStatusText('looks_ok').title).toMatch(/looks OK/i);
   });
   it('has no digits, codes or money in any patient text', () => {
     const all = [
-      ...(['waiting', 'no_one_reachable', 'ok_to_go', 'dont_pay'] as const).map((s) =>
+      ...(['waiting', 'no_one_reachable', 'ok_to_go', 'looks_ok', 'dont_pay'] as const).map((s) =>
         JSON.stringify(patientStatusText(s)),
       ),
       ...REASONS.map((r) => patientReason([r]) ?? ''),

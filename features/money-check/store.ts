@@ -8,6 +8,8 @@ export interface RequestStore {
   /** The patient's most recently decided request. */
   latestDecided(patientId: string): MoneyRequest | undefined;
   countSince(patientId: string, sinceIso: string): number;
+  /** Requests auto-cleared since `sinceIso`, newest first (so the caregiver can see what the AI let through). */
+  clearedSince(patientId: string, sinceIso: string): MoneyRequest[];
   put(r: MoneyRequest): void;
   addAudit(e: AuditEntry & { patientId: string }): void;
   audit(patientId: string): AuditEntry[];
@@ -39,6 +41,11 @@ export class MemoryRequestStore implements RequestStore {
   countSince = (patientId: string, sinceIso: string) =>
     [...this.requests.values()].filter((r) => r.patientId === patientId && r.createdAt >= sinceIso)
       .length;
+  clearedSince = (patientId: string, sinceIso: string) =>
+    [...this.requests.values()]
+      .filter((r) => r.patientId === patientId && r.status === 'cleared' && r.createdAt >= sinceIso)
+      .sort((a, b) => b.createdAt.localeCompare(a.createdAt))
+      .map((r) => structuredClone(r));
   put = (r: MoneyRequest) => void this.requests.set(r.id, structuredClone(r));
   addAudit = (e: AuditEntry & { patientId: string }) => void this.log.push({ ...e });
   audit = (patientId: string) =>

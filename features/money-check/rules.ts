@@ -2,6 +2,7 @@ import { z } from 'zod';
 import type { BankTransaction } from '@core/providers/types';
 import type { Kind, Level, Reason } from './schemas';
 import { NOTE_MAX } from './schemas';
+import { CLEAR_CONFIDENCE } from './constants';
 
 /** Above this a bill gets a closer look from the caregiver. */
 export const LARGE_AMOUNT_CENTS = 20_000;
@@ -53,6 +54,12 @@ const PRESSURE =
 const BILL =
   /bill|invoice|electric|water|\bgas\b|rent|utility|insurance|phone|cable|internet|mortgage|property tax/i;
 
+const EVERYDAY =
+  /grocer|supermarket|\bfood\b|\bmilk\b|\bbread\b|lunch|dinner|pharmacy|prescription|medicine|\bhaircut\b|laundry|newspaper|bus fare|taxi|\bcoffee\b/i;
+/** Someone else is involved (a caller, a message, a pop-up, a door-knocker): never cleared without the caregiver. */
+const SOMEONE =
+  /\bcall(ed|er|s)?\b|on the phone|phone call|text(ed| message)|e-?mail|pop-?up|at the door|someone|a man|a woman|stranger|website|\blink\b|told me|asked me|\bsaid\b|\bsays\b/i;
+
 /**
  * Plain rules over the typed note: the SAFETY FLOOR. Scam words => stop. Bill words => the bank check. Anything else =>
  * "check" with a reason, never "ok" (text alone cannot prove a payment is real).
@@ -64,7 +71,16 @@ export function assessNote(
   if (GIFT.test(note)) return { ...assess('gift_card', bills), kind: 'gift_card' };
   if (PRESSURE.test(note))
     return { ...assess('caller_wants_money', bills), kind: 'caller_wants_money' };
-  if (BILL.test(note)) return { ...assess('bill', bills), kind: 'bill' };
+  const someone = SOMEONE.test(note);
+  if (BILL.test(note)) {
+    const a = assess('bill', bills);
+    // A bill someone else is pushing is not "a known bill": the caregiver looks.
+    return someone
+      ? { ...a, level: 'check', reasons: ['unclear_purpose'], kind: 'bill' }
+      : { ...a, kind: 'bill' };
+  }
+  if (EVERYDAY.test(note) && !someone)
+    return { level: 'ok', reasons: ['everyday_purchase'], bill: null, kind: 'described' };
   return { level: 'check', reasons: ['unclear_purpose'], bill: null, kind: 'described' };
 }
 
@@ -118,4 +134,18 @@ export function mergeAi(rules: Assessment, ai: AiVerdict | null): Assessment {
     (r) => !(level !== 'ok' && r === 'known_bill'),
   );
   return { ...rules, level, reasons };
+}
+
+/**
+ * Clear a payment WITHOUT the caregiver only when ALL hold: rules say ordinary ("ok"), a model says "ok" with no warning
+ * reasons and high confidence. No model, an unsure model or any doubt means the caregiver is asked. Never for kinds picked by tap.
+ */
+export function canAutoClear(final: Assessment, ai: AiVerdict | null): boolean {
+  return (
+    final.level === 'ok' &&
+    ai !== null &&
+    ai.level === 'ok' &&
+    ai.reasons.length === 0 &&
+    ai.confidence >= CLEAR_CONFIDENCE
+  );
 }

@@ -6,6 +6,7 @@ import type { PlaidPort } from '@core/providers/types';
 import { HttpError } from '@core/server/errors';
 import {
   AI_TIMEOUT_MS,
+  CLEARED_VISIBLE_MS,
   DAY_MS,
   MAX_REQUESTS_PER_DAY,
   OUTCOME_MS,
@@ -16,6 +17,7 @@ import {
   aiPrompt,
   assess,
   assessNote,
+  canAutoClear,
   mergeAi,
   parseAiVerdict,
   redactNote,
@@ -64,7 +66,7 @@ export function createMoneyCheckService({
   };
   const audit = (
     r: MoneyRequest,
-    action: 'created' | 'approved' | 'declined' | 'expired',
+    action: 'created' | 'approved' | 'declined' | 'expired' | 'auto_cleared',
     by: string | null,
   ) =>
     store.addAudit({
@@ -90,13 +92,15 @@ export function createMoneyCheckService({
   };
 
   const patientStatus = (r: MoneyRequest): PatientStatus =>
-    r.status === 'approved'
-      ? 'ok_to_go'
-      : r.status === 'declined'
-        ? 'dont_pay'
-        : r.delivered
-          ? 'waiting'
-          : 'no_one_reachable';
+    r.status === 'cleared'
+      ? 'looks_ok'
+      : r.status === 'approved'
+        ? 'ok_to_go'
+        : r.status === 'declined'
+          ? 'dont_pay'
+          : r.delivered
+            ? 'waiting'
+            : 'no_one_reachable';
 
   /** The patient sees a status and plain reason codes. Never a payee or an amount. */
   const patientView = (r: MoneyRequest) => ({
@@ -155,7 +159,21 @@ export function createMoneyCheckService({
       // Rules are the floor. For typed text a model may add a second opinion, but it can only raise the level.
       let verdict =
         note !== null ? assessNote(note, bills) : { ...assess(tapKind!, bills), kind: tapKind! };
-      if (note !== null) verdict = { ...verdict, ...mergeAi(verdict, await askAi(note)) };
+      let cleared = false;
+      let aiChecked = false;
+      if (note !== null) {
+        const ai = await askAi(note);
+        aiChecked = ai !== null;
+        verdict = { ...verdict, ...mergeAi(verdict, ai) };
+        cleared = canAutoClear(verdict, ai);
+        // "Ordinary" by the rules but no confident model second opinion: a person looks, never a silent "ok".
+        if (verdict.level === 'ok' && !cleared)
+          verdict = {
+            ...verdict,
+            level: 'check',
+            reasons: [...new Set([...verdict.reasons, 'ai_unsure' as const])],
+          };
+      }
       // A concurrent tap may have created the request while we awaited the bank / model.
       const raced = store.getOpen(patientId);
       if (raced) return { request: patientView(raced), alreadyOpen: true };
@@ -168,6 +186,7 @@ export function createMoneyCheckService({
         reasons: verdict.reasons,
         billId: verdict.bill?.id ?? null,
         note,
+        aiChecked,
         createdAt: now().toISOString(),
         expiresAt: new Date(now().getTime() + REQUEST_TTL_MS).toISOString(),
         status: 'pending',
@@ -175,6 +194,19 @@ export function createMoneyCheckService({
         decidedBy: null,
         decidedAt: null,
       };
+      if (cleared) {
+        // Ordinary everyday payment: no push, no alert. The patient is told it looks OK; the caregiver can see it later.
+        const done: MoneyRequest = {
+          ...r,
+          status: 'cleared',
+          decidedBy: null,
+          decidedAt: r.createdAt,
+        };
+        store.put(done);
+        audit(done, 'created', user.id);
+        audit(done, 'auto_cleared', null);
+        return { request: patientView(done), alreadyOpen: false };
+      }
       store.put(r);
       audit(r, 'created', user.id);
       await bus.emit('caregiver.alert', {
@@ -205,7 +237,11 @@ export function createMoneyCheckService({
         // Show the outcome of the latest decision for a while, so the patient is never left guessing.
         return { request: r && r.status === 'pending' ? patientView(r) : latestOutcome() };
       }
-      if (!r || r.status !== 'pending') return { request: null, bill: null };
+      const cleared = store
+        .clearedSince(patientId, new Date(now().getTime() - CLEARED_VISIBLE_MS).toISOString())
+        .slice(0, 3)
+        .map((c) => ({ note: c.note, at: c.createdAt }));
+      if (!r || r.status !== 'pending') return { request: null, bill: null, cleared };
       let bill = null;
       if (r.billId) {
         try {
@@ -214,7 +250,7 @@ export function createMoneyCheckService({
           // bank unavailable: the request is still shown
         }
       }
-      return { request: r, bill };
+      return { request: r, bill, cleared };
 
       function latestOutcome() {
         const done = store.latestDecided(patientId);
@@ -231,7 +267,10 @@ export function createMoneyCheckService({
       const status = decision === 'approve' ? 'approved' : 'declined';
       if (r.status === status && r.decidedBy === user.id) return r; // repeated tap by the same caregiver
       if (r.status !== 'pending')
-        throw new HttpError(409, r.decidedBy === null ? 'expired' : 'already_decided');
+        throw new HttpError(
+          409,
+          r.status === 'cleared' || r.decidedBy !== null ? 'already_decided' : 'expired',
+        );
       const done: MoneyRequest = {
         ...r,
         status,
