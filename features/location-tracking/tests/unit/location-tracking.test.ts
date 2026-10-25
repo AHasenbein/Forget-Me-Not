@@ -277,3 +277,41 @@ describe('location-tracking', () => {
     });
   });
 });
+
+describe('find-them session', () => {
+  const post = (path: string, who?: (typeof users)[number]) =>
+    app().request(`/api/location-tracking${path}`, {
+      method: 'POST',
+      headers: { ...(who ? bearer(who) : {}), 'content-type': 'application/json' },
+      body: '{}',
+    });
+
+  it('caregiver starts it, patient sees it, it expires on the server clock', async () => {
+    expect((await (await post('/find', caregiver)).json()).active).toBe(true);
+    expect((await (await call('/find', patient)).json()).active).toBe(true);
+    clock.advance(11 * 60_000);
+    expect((await (await call('/find', patient)).json()).active).toBe(false);
+  });
+  it('is audited once and the follow-up reads are not', async () => {
+    await call('/readings', patient, { readings: [reading()] });
+    await post('/find', caregiver);
+    await call('/location', caregiver);
+    await call('/location', caregiver);
+    const views = (await (await call('/views', caregiver)).json()).views;
+    expect(views.filter((v: { purpose: string }) => v.purpose === 'find_session')).toHaveLength(1);
+    expect(views).toHaveLength(1);
+  });
+  it('patient can end it; patient and circle members cannot start it', async () => {
+    expect((await post('/find', patient)).status).toBe(403);
+    expect((await post('/find', daughter)).status).toBe(403);
+    expect((await post('/find', friend)).status).toBe(403);
+    expect((await post('/find')).status).toBe(401);
+    await post('/find', caregiver);
+    expect((await (await post('/find/stop', patient)).json()).active).toBe(false);
+  });
+  it('is scoped to the caller’s own patient', async () => {
+    await post('/find', caregiver);
+    expect((await (await call('/find', otherPatient)).json()).active).toBe(false);
+    expect((await (await post('/find', unlinkedCaregiver)).json()).active).toBe(false);
+  });
+});

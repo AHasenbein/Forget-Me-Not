@@ -14,3 +14,9 @@ export const postReadings = (ctx: RouteContext) =>
 export const getLocation = (ctx: RouteContext) => getRuntime().service.view(user(ctx));
 
 export const getViews = (ctx: RouteContext) => getRuntime().service.views(user(ctx));
+
+export const startFind = (ctx: RouteContext) => getRuntime().service.startFind(user(ctx));
+
+export const stopFind = (ctx: RouteContext) => getRuntime().service.stopFind(user(ctx));
+
+export const getFind = (ctx: RouteContext) => getRuntime().service.findStatus(user(ctx));
