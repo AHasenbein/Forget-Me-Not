@@ -34,6 +34,9 @@ services:
         value: '24'
       - key: EXPO_PUBLIC_DATA_MODE
         value: demo
+      # The web build runs with NODE_ENV=production, so demo needs this explicit opt-in (inlined at build time).
+      - key: EXPO_PUBLIC_ALLOW_DEMO_IN_PRODUCTION
+        value: 'true'
       - key: EXPO_PUBLIC_API_URL
         value: https://fmn-api.onrender.com
     routes:
