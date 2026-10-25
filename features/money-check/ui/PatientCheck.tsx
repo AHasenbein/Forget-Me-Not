@@ -4,7 +4,7 @@ import { ApiError } from '@core/client/api';
 import { useSession } from '@core/client/session';
 import { AppText, BigButton, Card, Field, Icon } from '@core/design-system/components';
 import type { WidgetProps } from '@core/feature-registry/ui';
-import { palette } from '@core/design-system/tokens';
+import { palette, radius } from '@core/design-system/tokens';
 import type { PatientStatus, Reason } from '../schemas';
 import {
   LOOKS_OK_MS,
@@ -129,7 +129,10 @@ export function PatientCheck({ collapsed = false, onActivity }: WidgetProps) {
           <BigButton tone="ghost" label="Never mind" onPress={() => setOpen(false)} />
         </Card>
       ) : (
-        <BigButton tone="ghost" label="Enter payment description" onPress={() => setOpen(true)} />
+        // A paler blue than the shell's "Before I pay" button, so it reads as one of its options.
+        <View style={{ backgroundColor: '#EDF4FC', borderRadius: radius.md }}>
+          <BigButton tone="ghost" label="Enter payment description" onPress={() => setOpen(true)} />
+        </View>
       )}
       {problem ? (
         <Card tone="danger">
