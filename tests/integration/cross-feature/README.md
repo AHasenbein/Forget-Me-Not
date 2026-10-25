@@ -6,7 +6,7 @@ mock location/notifier/AI). Status below: update `todo` -> `done` in the PR that
 
 | Status | Scenario                                                                                         |
 | ------ | ------------------------------------------------------------------------------------------------ |
-| todo   | scam-call-guard emits an alert that notifications delivers to the caregiver                      |
+| done   | scam-call-guard emits an alert that notifications delivers to the caregiver                      |
 | done   | lost-button respects location-tracking permissions                                               |
 | todo   | gift-card-guard approval flow vs bill-tracker                                                    |
 | todo   | reminders escalate to the caregiver when unconfirmed                                             |
