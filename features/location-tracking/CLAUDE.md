@@ -81,7 +81,9 @@ Until the Supabase adapter lands, the in-memory store in `server/store.ts` is th
   "Open in Maps" is a user-initiated link (no third-party map tiles are fetched, so the area is not leaked).
 - "Who looked recently": last 5 rows of `GET /views` in plain words (Caregiver / Family member / Lost-button alert; blocked
   attempts in red). Never shows ids or coordinates.
-- No patient widget: the device tracker is not wired into the app yet, so a "sharing your location" status would be untrue.
+- Patient widget (order 90, `PatientLocationSharing`): starts the tracker when the patient dashboard mounts (no shell change needed) and shows
+  its real state (finding / working / turned off / cannot find). Web uses `tracker/web.ts` (`navigator.geolocation`, i.e. Google's
+  location service in Chrome, foreground only, tab must stay open); phones use `tracker/expo.ts` (dev build, still unverified on a device).
 
 ## Later PRs
 
