@@ -6,7 +6,7 @@ Read the root `CLAUDE.md` first. Stay inside `features/lost-button/`.
 
 The patient presses "I'm lost". The primary caregiver is notified immediately and keeps being notified until they
 acknowledge that they are coming. The caregiver sees the patient's last known location (read through
-`LocationReadContract`, R2). Circle members have NO access. This PR is the server side; the patient screen is a separate PR.
+`LocationReadContract`, R2). Circle members have NO access. The UI lives in `ui/` (see below).
 
 ## Public interface
 
@@ -42,6 +42,19 @@ try `demo:daughter` (403: circle members cannot see or act on lost alerts). Run 
   unlinked caregiver stops receiving. The patient is told `no_one_reachable`, never "we told your caregiver", unless a push was delivered.
 - Push body is generic and carries only the alert id. Never put a name, place or coordinates in it.
 - A press after an acknowledged-but-unresolved alert returns the same alert (`on_the_way`); the caregiver resolves it.
+
+## UI (`ui/`, dashboard widgets)
+
+- Patient widget (order 90, under the reminders): one OUTLINED "I'm lost" button, so the screen keeps one primary action. One tap sends
+  the alert (no extra confirm step; repeated taps are idempotent). Then a status card replaces the button, no cancel. The wording only
+  says "told" when a push was delivered; never a name, place, number or code.
+- Caregiver widget (order 1, renders nothing until an alert is open): urgent card with press time, whether the phone was notified, the
+  last-seen line (absolute time + accuracy, never "now"), "Open in Maps" (user-initiated link), "I'm on my way", and "They are safe"
+  (tap twice; the armed state expires after 5 s).
+- `ui/useActive.ts` polls every 5 s while no alert is open (that caregiver call reads no location) and every 30 s while one is open
+  (each call then reads and audit-logs the location). It keeps the last data while reloading (the shared `usePoll` clears it).
+- The route inputs are strict empty objects: the client must send `{}` as the body, not no body.
+- In demo mode the location comes from the mock provider, so these reads do not appear in location-tracking's views list.
 
 ## Needs a job runner (not built yet)
 
