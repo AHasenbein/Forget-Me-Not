@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Image, Platform, Pressable, View } from 'react-native';
 import { ApiError } from '@core/client/api';
 import { useSession } from '@core/client/session';
@@ -48,12 +48,18 @@ function BillTable({ scan }: { scan: PatientScan }) {
  * (web) or, in the demo, pick a sample bill. The answer is a three-row table in very simple words. It never says
  * "pay it": a bill with scam warning signs says "please don't pay this yet" and the caregiver is told.
  */
-export function PatientBill({ collapsed = false }: WidgetProps) {
+export function PatientBill({ collapsed = false, onHold }: WidgetProps) {
   const { api, demo } = useSession();
   const [step, setStep] = useState<Step>('closed');
   const [busy, setBusy] = useState(false);
   const [problem, setProblem] = useState('');
   const [scan, setScan] = useState<PatientScan | null>(null);
+
+  // From "Show me the bill" to "Done" the "Before I pay" group stays open: a camera, a reading and a result take time.
+  useEffect(() => {
+    onHold?.(step !== 'closed');
+    return () => onHold?.(false);
+  }, [step, onHold]);
 
   const send = async (frames: Frame[]) => {
     if (busy) return;

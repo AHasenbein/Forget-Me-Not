@@ -28,7 +28,7 @@ interface Active {
  * It stays secondary so the screen keeps ONE primary action (the
  * reminder). A short box to type what the payment is for. The patient cannot approve anything: only the caregiver can.
  */
-export function PatientCheck({ collapsed = false, onActivity }: WidgetProps) {
+export function PatientCheck({ collapsed = false, onActivity, onHold }: WidgetProps) {
   const { api, token } = useSession();
   const { data, reload } = useRequest(() => api<Active>('GET', `${BASE}/requests/active`), [token]);
   const [open, setOpen] = useState(false);
@@ -36,6 +36,12 @@ export function PatientCheck({ collapsed = false, onActivity }: WidgetProps) {
   const [note, setNote] = useState('');
   const [problem, setProblem] = useState('');
   const current = data?.request ?? null;
+
+  // While the description box is open the "Before I pay" group stays open: reading and typing can take a while.
+  useEffect(() => {
+    onHold?.(open);
+    return () => onHold?.(false);
+  }, [open, onHold]);
 
   // "This looks OK" clears itself after 5 s; a tap clears it, but only once it has been up for 1 s.
   const okId = current?.status === 'looks_ok' ? current.id : null;

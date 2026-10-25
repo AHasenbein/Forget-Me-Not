@@ -1,5 +1,5 @@
 import { Link, usePathname, useRouter } from 'expo-router';
-import { useCallback, useEffect, useState, type ReactNode } from 'react';
+import { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react';
 import { Platform, Pressable, ScrollView, Text, useWindowDimensions, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import {
@@ -160,18 +160,40 @@ const GROUP_BG = '#DCEAF8';
 
 /**
  * One button ("Before I pay") that opens its members' own sub-buttons. It folds back by itself after 5 s with no touch or
- * typing (no Back button for a confused user to hunt for). Members stay mounted so their state survives and a pending
- * warning stays visible while the group is closed.
+ * typing (no Back button for a confused user to hunt for), unless a member holds it open because the patient is in the
+ * middle of something there (`onHold`). Members stay mounted so their state survives and a pending warning stays visible
+ * while the group is closed.
  */
 function WidgetGroupView({ group, members }: { group: WidgetGroup; members: Widget[] }) {
   const [open, setOpen] = useState(false);
   const [beat, setBeat] = useState(0);
+  const [holding, setHolding] = useState<ReadonlySet<string>>(new Set());
   const touch = useCallback(() => setBeat((n) => n + 1), []);
+  // One stable callback per member, so a member's effect does not re-run on every render of the group.
+  const ids = members.map((w) => w.id).join('|');
+  const holds = useMemo(
+    () =>
+      Object.fromEntries(
+        ids.split('|').map((id) => [
+          id,
+          (on: boolean) =>
+            setHolding((s) => {
+              if (s.has(id) === on) return s;
+              const next = new Set(s);
+              if (on) next.add(id);
+              else next.delete(id);
+              return next;
+            }),
+        ]),
+      ),
+    [ids],
+  );
+  const held = holding.size > 0;
   useEffect(() => {
-    if (!open) return;
+    if (!open || held) return;
     const t = setTimeout(() => setOpen(false), GROUP_IDLE_MS);
     return () => clearTimeout(t);
-  }, [open, beat]);
+  }, [open, beat, held]);
   return (
     <View
       style={{ width: '100%', maxWidth: 640, alignSelf: 'center', gap: 12 }}
@@ -181,7 +203,7 @@ function WidgetGroupView({ group, members }: { group: WidgetGroup; members: Widg
       }}
     >
       {members.map((w) => (
-        <w.Component key={w.id} collapsed={!open} onActivity={touch} />
+        <w.Component key={w.id} collapsed={!open} onActivity={touch} onHold={holds[w.id]} />
       ))}
       {open ? null : (
         <View style={{ backgroundColor: GROUP_BG, borderRadius: radius.md }}>
