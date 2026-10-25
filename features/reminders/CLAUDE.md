@@ -69,7 +69,7 @@ After the patient taps "I took it" on a pill, the app offers to take ~4 photos (
   PNG labelled JPEG, or a script, is refused before any model sees it), at most 5 photos, body size limit before parsing.
   Text inside photos can never trigger anything: the only effect is a verification label.
 - Demo: Settings > Demo controls > "Pill photo check" picks what the canned check sees (Clear / Unclear / Not taken).
-  Live: `DATA_MODE_VISION=live` + `AI_API_KEY` uses `core/ai/claude-vision.ts` (claude-opus-5-5, structured output).
+  Live: `DATA_MODE_VISION=live` + `OPENROUTER_API_KEY` uses `core/ai/openrouter-vision.ts` (OpenRouter chat completions, model from `OPENROUTER_MODEL`, structured output).
 - Routes: `POST /occurrences/:id/pill-check` (P), `GET /occurrences/:id/frames` (C), `POST /occurrences/:id/review` (C), `GET /audit` (C).
 
 ## The clock
@@ -83,7 +83,7 @@ speeding up or skipping demo time fires it immediately. Live: the API process ru
 - Known limit: the "no two pills in 2h" check spans two rows, so two simultaneous confirms of different pills could both
   pass. Closing it needs a Postgres function.
 - **No real push**: prompts go to the mock notifier; the patient sees them in the app. `expo-notifications` needs a dev build.
-- The live photo check has not been run against the real model (no `AI_API_KEY` yet): only its request/response handling is
+- The live photo check has not been run against the real model (no `OPENROUTER_API_KEY` yet): only its request/response handling is
   tested with a fake client. Camera needs a secure origin: `localhost` works; a phone browser on `http://<LAN-ip>` does not.
 - Patient name is hardcoded as "Margaret" in caregiver copy until a profile exists.
 - Missed-reminder delivery to the caregiver belongs to the notifications feature (stand-in in the cross-feature test).
