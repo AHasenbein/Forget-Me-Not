@@ -1,6 +1,6 @@
 import { UNREADABLE } from '../ai/documents';
 import { createDemoVision } from './vision';
-import { createMockAi } from '../testing/mocks/ai';
+import { createDemoAi } from './ai';
 import { createMockLocation } from '../testing/mocks/location';
 import { createMockNotifier } from '../testing/mocks/notifier';
 import type { Providers } from '../providers/types';
@@ -24,7 +24,7 @@ export function demoVerifier(world: DemoWorld): Providers['verifier'] {
 export function demoProviders(world: DemoWorld): Providers {
   const granted = new Set([world.patient.id, world.caregiver.id, world.daughter.id]);
   return {
-    ai: createMockAi({ text: world.scamCall.summary, confidence: world.scamCall.confidence }),
+    ai: createDemoAi(world),
     vision: createDemoVision(),
     // Demo reads nothing by itself: the bill-reader feature registers its sample bills; any other picture is "unreadable".
     documents: { readBill: async () => UNREADABLE },
