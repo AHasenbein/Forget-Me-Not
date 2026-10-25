@@ -5,6 +5,8 @@ export interface PaperStory {
   headline: string;
   summary: string;
   source: string;
+  /** The full story on the publisher's site. Optional so an older API still renders. */
+  url?: string | null;
 }
 export interface Paper {
   editionId: string;
@@ -18,7 +20,7 @@ export interface Paper {
 
 export type Page =
   | { kind: 'message'; text: string; when: string }
-  | { kind: 'story'; headline: string; summary: string; source: string }
+  | { kind: 'story'; headline: string; summary: string; source: string; url: string | null }
   | { kind: 'empty' }
   | { kind: 'tip'; text: string };
 
@@ -32,7 +34,13 @@ export function buildPages(p: Paper): Page[] {
       when: whenLabel(p.message.writtenAt, p.now),
     });
   for (const s of p.stories)
-    pages.push({ kind: 'story', headline: s.headline, summary: s.summary, source: s.source });
+    pages.push({
+      kind: 'story',
+      headline: s.headline,
+      summary: s.summary,
+      source: s.source,
+      url: s.url ?? null,
+    });
   if (!p.stories.length) pages.push({ kind: 'empty' });
   if (p.tip) pages.push({ kind: 'tip', text: p.tip });
   return pages;

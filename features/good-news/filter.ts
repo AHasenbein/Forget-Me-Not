@@ -51,5 +51,6 @@ export function selectStories(items: readonly RawItem[], now: Date): Story[] {
     summary: i.summary,
     source: i.source,
     publishedAt: i.publishedAt,
+    url: i.url,
   }));
 }

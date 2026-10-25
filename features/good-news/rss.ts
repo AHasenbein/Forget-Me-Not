@@ -5,6 +5,8 @@ export interface RawItem {
   summary: string;
   publishedAt: string | null; // ISO
   source: string;
+  /** The full story on the publisher's own site (https, same domain as the feed), else null. */
+  url: string | null;
 }
 
 const ENTITIES: Record<string, string> = {
@@ -76,8 +78,31 @@ const capLength = (s: string, max: number) =>
 const tag = (block: string, name: string) =>
   new RegExp(`<${name}(?:\\s[^>]*)?>([\\s\\S]*?)</${name}>`, 'i').exec(block)?.[1] ?? '';
 
-/** Minimal RSS 2.0 reader: titles, descriptions and dates. Anything malformed is skipped, never thrown. */
-export function parseRss(xml: string, source: string): RawItem[] {
+/**
+ * The item's link, only if it is https and on the feed's own domain (or a subdomain of it). The link is feed text we
+ * don't control: a feed can never send the patient to some other site, or to a javascript: URL.
+ */
+export function safeLink(raw: string, feedUrl: string | undefined): string | null {
+  if (!feedUrl) return null;
+  try {
+    const url = new URL(decodeEntities(raw.replace(/<!\[CDATA\[([\s\S]*?)\]\]>/g, '$1')).trim());
+    const host = new URL(feedUrl).hostname.replace(/^www\./, '');
+    const ok =
+      url.protocol === 'https:' &&
+      !url.username &&
+      !url.password &&
+      (url.hostname === host || url.hostname.endsWith(`.${host}`));
+    return ok ? url.href : null;
+  } catch {
+    return null;
+  }
+}
+
+const permalink = (block: string) =>
+  /<guid\b[^>]*isPermaLink=["']true["'][^>]*>([\s\S]*?)<\/guid>/i.exec(block)?.[1] ?? '';
+
+/** Minimal RSS 2.0 reader: titles, descriptions, dates and links. Anything malformed is skipped, never thrown. */
+export function parseRss(xml: string, source: string, feedUrl?: string): RawItem[] {
   const items: RawItem[] = [];
   for (const m of xml.matchAll(/<item\b[^>]*>([\s\S]*?)<\/item>/gi)) {
     if (items.length >= MAX_ITEMS_PER_FEED) break;
@@ -91,6 +116,7 @@ export function parseRss(xml: string, source: string): RawItem[] {
       summary,
       publishedAt: Number.isFinite(t) ? new Date(t).toISOString() : null,
       source,
+      url: safeLink(tag(block, 'link'), feedUrl) ?? safeLink(permalink(block), feedUrl),
     });
   }
   return items;

@@ -1,6 +1,6 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useEffect, useState } from 'react';
-import { Modal, ScrollView, View } from 'react-native';
+import { Linking, Modal, ScrollView, View } from 'react-native';
 import { useSession } from '@core/client/session';
 import { AppText, BigButton, Card, ProgressDots } from '@core/design-system/components';
 import { palette } from '@core/design-system/tokens';
@@ -191,6 +191,13 @@ function PageBody({ page }: { page: Page }) {
       <AppText variant="small" tone="muted">
         From {page.source}
       </AppText>
+      {page.url ? (
+        <BigButton
+          tone="ghost"
+          label="Read the whole story"
+          onPress={() => void Linking.openURL(page.url!).catch(() => undefined)}
+        />
+      ) : null}
     </>
   );
 }

@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { FakeClock } from '@core/testing';
 import { isGentle, selectStories } from '../../filter';
-import { decodeEntities, parseRss, shorten, toPlainText } from '../../rss';
+import { decodeEntities, parseRss, safeLink, shorten, toPlainText } from '../../rss';
 import { createFeedSource } from '../../sources';
 
 const item = (title: string, desc: string, date: string) =>
@@ -28,6 +28,7 @@ describe('rss parsing', () => {
       summary: 'The sky he painted matches July 1889. It is lovely.',
       publishedAt: '2026-10-24T17:19:53.000Z',
       source: 'Good News Network',
+      url: null, // no feed URL given, so no link
     });
   });
 
@@ -95,11 +96,42 @@ describe('patient-safety filter', () => {
       { title: 'Old news', summary: '', publishedAt: '2026-01-01T00:00:00Z', source: 'C' },
       { title: 'No date', summary: '', publishedAt: null, source: 'C' },
     ];
-    const picked = selectStories(raw, clock.now());
+    const picked = selectStories(
+      raw.map((i) => ({ ...i, url: null })),
+      clock.now(),
+    );
     expect(picked).toHaveLength(6);
     expect(new Set(picked.map((s) => s.headline)).size).toBe(6);
     expect(picked.map((s) => s.headline)).not.toContain('Old news');
     expect(new Set(picked.slice(0, 2).map((s) => s.source)).size).toBe(2); // interleaved
+  });
+});
+
+describe('story links', () => {
+  const feedUrl = 'https://www.goodnewsnetwork.org/feed/';
+
+  it('keeps an https link on the feed’s own domain, from <link> or a permalink guid', () => {
+    const withLink = `<item><title>Bees</title><link>https://www.goodnewsnetwork.org/bees/?a=1&amp;b=2</link><pubDate>${recent}</pubDate></item>`;
+    const withGuid = `<item><title>Owls</title><guid isPermaLink="true">https://goodnewsnetwork.org/owls/</guid><pubDate>${recent}</pubDate></item>`;
+    expect(parseRss(feed(withLink, withGuid), 'GNN', feedUrl).map((i) => i.url)).toEqual([
+      'https://www.goodnewsnetwork.org/bees/?a=1&b=2',
+      'https://goodnewsnetwork.org/owls/',
+    ]);
+  });
+
+  it('drops links a feed could use to send the patient somewhere else', () => {
+    for (const bad of [
+      'javascript:alert(1)',
+      'http://www.goodnewsnetwork.org/bees/', // not https
+      'https://evil.example/bees/',
+      'https://goodnewsnetwork.org.evil.example/bees/',
+      'https://user:pw@www.goodnewsnetwork.org/bees/',
+      'data:text/html,hi',
+      'not a url',
+      '',
+    ])
+      expect(safeLink(bad, feedUrl)).toBeNull();
+    expect(safeLink('https://www.goodnewsnetwork.org/bees/', undefined)).toBeNull();
   });
 });
 
@@ -113,10 +145,19 @@ describe('feed source', () => {
   it('uses the feeds that answer and skips the ones that fail', async () => {
     const fetchFn = (async (url: string) =>
       url.includes('one')
-        ? ok(feed(item('Kind neighbour fixes bikes', 'Nice.', recent)))
+        ? ok(
+            feed(
+              item('Kind neighbour fixes bikes', 'Nice.', recent).replace(
+                '</title>',
+                '</title><link>https://one.example/bikes/</link>',
+              ),
+            ),
+          )
         : new Response('', { status: 500 })) as unknown as typeof fetch;
     const stories = await createFeedSource({ fetch: fetchFn, feeds }).stories(clock.now());
-    expect(stories.map((s) => s.headline)).toEqual(['Kind neighbour fixes bikes']);
+    expect(stories.map((s) => [s.headline, s.url])).toEqual([
+      ['Kind neighbour fixes bikes', 'https://one.example/bikes/'],
+    ]);
   });
 
   it('throws when no feed is reachable, and refuses oversized feeds', async () => {

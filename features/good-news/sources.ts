@@ -36,7 +36,7 @@ export function createFeedSource(deps: { fetch: typeof fetch; feeds?: typeof FEE
             signal: AbortSignal.timeout(FETCH_TIMEOUT_MS),
           });
           if (!res.ok) throw new Error(`feed ${res.status}`);
-          return parseRss(await readCapped(res), f.name);
+          return parseRss(await readCapped(res), f.name, f.url);
         }),
       );
       const ok = results.filter(

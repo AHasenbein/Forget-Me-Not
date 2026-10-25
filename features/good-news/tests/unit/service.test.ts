@@ -13,6 +13,7 @@ const story = (headline: string): Story => ({
   summary: '',
   source: 'S',
   publishedAt: null,
+  url: null,
 });
 
 function setup(source: NewsSource, fallback: NewsSource | null = null) {
