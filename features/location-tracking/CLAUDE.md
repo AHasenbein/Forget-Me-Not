@@ -106,3 +106,8 @@ Until the Supabase adapter lands, the in-memory store in `server/store.ts` is th
 - Compass: iOS needs a tap for motion permission (done in the Find button); desktop browsers have none. Needs HTTPS on phones
   for geolocation/compass (localhost is fine on the same machine; a LAN IP over http is not).
 - Edge cases: stale patient position is shown with its age; patient revokes at any time; session expiry ends it server-side.
+- Built-in map (`ui/FindMap.tsx`): drawn with plain Views, no map tiles and no third-party requests (tiles would reveal the area to a
+  provider). You in the centre, them as a dot with a faint GPS-uncertainty circle, auto-scaled distance rings. North up; with a compass
+  it turns so up is where you face. A real tile map still needs a decision on a provider (privacy) or a native SDK (new EAS build).
+- Testing on one machine: the patient only reports precisely while the patient screen is open, so with a single tab (persona switch)
+  the caregiver sees the old position and "their phone may be asleep". Use two tabs (patient + caregiver) to see it move.

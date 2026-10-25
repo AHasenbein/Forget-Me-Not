@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { View } from 'react-native';
+import { Text, View } from 'react-native';
 import { ApiError } from '@core/client/api';
 import { usePoll } from '@core/client/hooks';
 import { useSession } from '@core/client/session';
@@ -7,6 +7,7 @@ import { AppText, BigButton } from '@core/design-system/components';
 import { palette } from '@core/design-system/tokens';
 import type { LocationReading } from '@contracts/location';
 import { allowCompass, watchHeading, watchMyPosition } from './compass';
+import { FindMap } from './FindMap';
 import { arrowRotationDeg, findLine, guide, type Point } from './find';
 
 const BASE = '/api/location-tracking';
@@ -123,14 +124,13 @@ export function FindThem() {
               opacity: g.tooCloseToTell ? 0.3 : 1,
             }}
           >
-            <AppText variant="title" tone={g.tooCloseToTell ? 'muted' : undefined}>
-              ⬆
-            </AppText>
+            <Text style={{ fontSize: 96, lineHeight: 104, color: palette.primary }}>⬆</Text>
           </View>
           <AppText>{findLine(g, heading !== null, ageSec)}</AppText>
+          {me && them ? <FindMap g={g} them={them} heading={heading} /> : null}
           {heading === null ? (
             <AppText variant="small" tone="muted">
-              No compass on this device, so the arrow points north. Use the words above.
+              No compass on this device, so up on the screen is north. Use the words above.
             </AppText>
           ) : null}
         </>

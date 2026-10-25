@@ -36,6 +36,7 @@ const WHO: Record<string, string> = {
 
 /** One row of the "who looked" list, in plain words. Unknown purposes fall back safely. */
 export function viewLabel(row: Pick<ViewRow, 'purpose' | 'outcome'>): string {
+  if (row.purpose === 'find_session') return 'Started a find-them session';
   const who = WHO[row.purpose] ?? 'Someone';
   switch (row.outcome) {
     case 'denied':

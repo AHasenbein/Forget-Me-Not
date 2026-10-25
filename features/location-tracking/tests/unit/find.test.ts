@@ -6,6 +6,9 @@ import {
   distanceLine,
   distanceM,
   findLine,
+  accuracyPx,
+  mapOffsetPx,
+  mapRingM,
   guide,
 } from '../../ui/find';
 
@@ -46,5 +49,19 @@ describe('find maths', () => {
     expect(findLine(far, true, 3)).toContain('Follow the arrow');
     expect(findLine(far, true, 90)).toContain('90 seconds ago');
     expect(findLine(guide(p(40, -74, 30), p(40, -74, 30)), true, 1)).toContain('very close');
+  });
+  it('map: ring fits them, offsets are north-up and clamped', () => {
+    expect(mapRingM(40)).toBe(50);
+    expect(mapRingM(500)).toBe(1000);
+    expect(mapRingM(10_000_000)).toBe(500_000);
+    const east = mapOffsetPx({ distanceM: 50, bearing: 90 }, 100, 100);
+    expect(Math.round(east.x)).toBe(50);
+    expect(Math.abs(Math.round(east.y))).toBe(0);
+    const north = mapOffsetPx({ distanceM: 50, bearing: 0 }, 100, 100);
+    expect(Math.round(north.y)).toBe(-50); // north is UP on screen
+    expect(
+      Math.hypot(...Object.values(mapOffsetPx({ distanceM: 9999, bearing: 45 }, 100, 100))),
+    ).toBeCloseTo(100);
+    expect(accuracyPx(1, 100, 1000)).toBe(6);
   });
 });

@@ -79,9 +79,32 @@ export const compassWord = (bearing: number) => COMPASS[Math.round(norm360(beari
 /** One honest sentence under the arrow. */
 export function findLine(g: FindGuide, hasHeading: boolean, theirAgeSec: number): string {
   const age =
-    theirAgeSec > 30 ? ` Their last update was ${Math.round(theirAgeSec)} seconds ago.` : '';
+    theirAgeSec > 30
+      ? ` Their last update was ${Math.round(theirAgeSec)} seconds ago, so their phone may be asleep or the app closed.`
+      : '';
   if (g.tooCloseToTell)
     return `You are very close (${distanceLine(g.distanceM)}). Look around: GPS cannot tell more.${age}`;
   const where = hasHeading ? 'Follow the arrow' : `Head ${compassWord(g.bearing)}`;
   return `${where}. They are ${distanceLine(g.distanceM)} away.${age}`;
 }
+
+/** Outer ring of the built-in map, in metres: the smallest "nice" step that keeps them on the map with some margin. */
+const RINGS_M = [25, 50, 100, 200, 500, 1000, 2000, 5000, 10_000, 50_000, 100_000, 500_000];
+export function mapRingM(distance: number): number {
+  return RINGS_M.find((r) => distance * 1.15 <= r) ?? RINGS_M.at(-1)!;
+}
+
+/** Pixel offset from the map centre (the caregiver), north up: x grows east, y grows DOWN (screen), clamped to the edge. */
+export function mapOffsetPx(
+  g: Pick<FindGuide, 'distanceM' | 'bearing'>,
+  radiusPx: number,
+  ringM: number,
+) {
+  const r = Math.min(g.distanceM / ringM, 1) * radiusPx;
+  const b = rad(g.bearing);
+  return { x: r * Math.sin(b), y: -r * Math.cos(b) };
+}
+
+/** Size of the "they could be anywhere in here" circle, in pixels, never smaller than the dot. */
+export const accuracyPx = (accuracyM: number, radiusPx: number, ringM: number) =>
+  Math.max(6, (accuracyM / ringM) * radiusPx);
