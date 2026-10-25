@@ -15,6 +15,9 @@ import { startJobs } from '../core/jobs/runner';
 import { getProviders, registerLive } from '../core/providers';
 import { createApp } from '../core/server/app';
 
+// Accept the common misspelling too: OPEN_ROUTER_API_KEY.
+const openRouterKey = process.env.OPENROUTER_API_KEY || process.env.OPEN_ROUTER_API_KEY;
+
 const manifests = await discoverManifests();
 loadEnv(manifests.filter((m) => isEnabled(m))); // fails fast on bad env
 const world = buildDemoWorld();
@@ -23,13 +26,15 @@ const world = buildDemoWorld();
 if (!isDemo()) registerLive('verifier', createVerifier(supabaseAuthPorts(serviceClient())));
 // Real photo checks only when asked for (DATA_MODE_VISION=live) AND a key exists; otherwise the canned check.
 if (dataMode('vision') === 'live') {
-  const { OPENROUTER_API_KEY: apiKey, OPENROUTER_MODEL: model } = process.env;
+  const apiKey = openRouterKey;
+  const model = process.env.OPENROUTER_MODEL;
   if (!apiKey) throw new Error('DATA_MODE_VISION=live needs OPENROUTER_API_KEY in .env');
   registerLive('vision', createOpenRouterVision({ apiKey, model: model || undefined }));
 }
 // Text AI (e.g. the money check's second opinion): live only when asked for (DATA_MODE_AI=live), and then it needs a key.
 if (dataMode('ai') === 'live') {
-  const { OPENROUTER_API_KEY: apiKey, OPENROUTER_MODEL: model } = process.env;
+  const apiKey = openRouterKey;
+  const model = process.env.OPENROUTER_MODEL;
   if (!apiKey) throw new Error('DATA_MODE_AI=live needs OPENROUTER_API_KEY in .env');
   registerLive('ai', createOpenRouterText({ apiKey, model: model || undefined }));
 }
