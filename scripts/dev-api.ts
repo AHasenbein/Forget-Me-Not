@@ -1,6 +1,7 @@
 import { serve } from '@hono/node-server';
 import { Hono } from 'hono';
 import { cors } from 'hono/cors';
+import { createOpenRouterText } from '../core/ai/openrouter-text';
 import { createOpenRouterVision } from '../core/ai/openrouter-vision';
 import { createClient } from '@supabase/supabase-js';
 import { createQuickLogin } from '../core/auth/quick-login';
@@ -25,6 +26,12 @@ if (dataMode('vision') === 'live') {
   const { OPENROUTER_API_KEY: apiKey, OPENROUTER_MODEL: model } = process.env;
   if (!apiKey) throw new Error('DATA_MODE_VISION=live needs OPENROUTER_API_KEY in .env');
   registerLive('vision', createOpenRouterVision({ apiKey, model: model || undefined }));
+}
+// Text AI (e.g. the money check's second opinion): live only when asked for (DATA_MODE_AI=live), and then it needs a key.
+if (dataMode('ai') === 'live') {
+  const { OPENROUTER_API_KEY: apiKey, OPENROUTER_MODEL: model } = process.env;
+  if (!apiKey) throw new Error('DATA_MODE_AI=live needs OPENROUTER_API_KEY in .env');
+  registerLive('ai', createOpenRouterText({ apiKey, model: model || undefined }));
 }
 const { verifier } = getProviders({ world });
 
