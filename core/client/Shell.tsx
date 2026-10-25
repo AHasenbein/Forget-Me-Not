@@ -13,7 +13,7 @@ import {
   Segmented,
   Screen,
 } from '../design-system/components';
-import { font, palette } from '../design-system/tokens';
+import { font, palette, radius } from '../design-system/tokens';
 import { ApiError } from './api';
 import { usePoll } from './hooks';
 import { formatTime } from './format';
@@ -155,6 +155,8 @@ function Widgets() {
 
 /** Idle time before an open group folds back to its one button. */
 const GROUP_IDLE_MS = 5000;
+/** Light blue wash behind a group's button, so it reads apart from "I’m lost" (soft red) above it. */
+const GROUP_BG = '#DCEAF8';
 
 /**
  * One button ("Before I pay") that opens its members' own sub-buttons. It folds back by itself after 5 s with no touch or
@@ -182,7 +184,9 @@ function WidgetGroupView({ group, members }: { group: WidgetGroup; members: Widg
         <w.Component key={w.id} collapsed={!open} onActivity={touch} />
       ))}
       {open ? null : (
-        <BigButton tone="ghost" label={WIDGET_GROUPS[group]} onPress={() => setOpen(true)} />
+        <View style={{ backgroundColor: GROUP_BG, borderRadius: radius.md }}>
+          <BigButton tone="ghost" label={WIDGET_GROUPS[group]} onPress={() => setOpen(true)} />
+        </View>
       )}
     </View>
   );

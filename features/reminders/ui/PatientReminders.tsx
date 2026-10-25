@@ -4,20 +4,11 @@ import { ApiError } from '@core/client/api';
 import { formatTime } from '@core/client/format';
 import { usePoll } from '@core/client/hooks';
 import { useSession } from '@core/client/session';
-import {
-  AppText,
-  BigButton,
-  Card,
-  Hero,
-  IconCircle,
-  ProgressDots,
-} from '@core/design-system/components';
+import { AppText, BigButton, Card, IconCircle } from '@core/design-system/components';
 import type { IconName } from '@core/design-system/tokens';
 import type { VisionFrame } from '@core/ai/vision';
 import {
   checkError,
-  dateLabelFor,
-  greetingFor,
   KIND,
   labelOf,
   taskOf,
@@ -215,19 +206,8 @@ export function PatientReminders() {
     );
   }
 
-  const total = items.filter((o) => o.phase !== 'skipped').length;
-  const doneCount = items.filter((o) => o.phase === 'confirmed').length;
   return (
     <View style={{ width: '100%', maxWidth: 640, alignSelf: 'center', gap: 20 }}>
-      <Hero>
-        <View style={{ gap: 4 }}>
-          <AppText variant="huge" tone="inverse">
-            {greetingFor(data.now, items[0]?.timeZone)}
-          </AppText>
-          <AppText tone="inverseMuted">{dateLabelFor(data.now, items[0]?.timeZone)}</AppText>
-        </View>
-        {total > 0 ? <ProgressDots inverse done={doneCount} total={total} /> : null}
-      </Hero>
       {card}
       {note ? (
         <Card>

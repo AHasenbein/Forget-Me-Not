@@ -3,7 +3,7 @@ import { View } from 'react-native';
 import { ApiError } from '@core/client/api';
 import { useSession } from '@core/client/session';
 import { AppText, BigButton, Card, Icon } from '@core/design-system/components';
-import { palette } from '@core/design-system/tokens';
+import { palette, radius } from '@core/design-system/tokens';
 import type { PatientStatus } from '../schemas';
 import { patientError, patientStatusText } from './model';
 import { useActive } from './useActive';
@@ -14,7 +14,7 @@ interface Active {
 }
 
 /**
- * Patient: one calm, outlined button under the reminders (it stays secondary so the screen keeps ONE primary
+ * Patient: one calm, outlined button under the reminders, on a soft red wash (it stays secondary so the screen keeps ONE primary
  * action). One tap sends the alert; the patient cannot cancel it, only the caregiver closes it.
  */
 export function PatientLost() {
@@ -55,7 +55,10 @@ export function PatientLost() {
           <AppText>{patientStatusText(alert.status).body}</AppText>
         </Card>
       ) : (
-        <BigButton tone="ghost" label="I’m lost" busy={busy} onPress={press} />
+        // Outlined button on a soft red wash: easy to find, still not the screen's primary action.
+        <View style={{ backgroundColor: palette.dangerBg, borderRadius: radius.md }}>
+          <BigButton tone="ghost" label="I’m lost" busy={busy} onPress={press} />
+        </View>
       )}
       {!alert ? (
         <AppText variant="small" tone="muted" center>

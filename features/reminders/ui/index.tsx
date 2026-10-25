@@ -7,10 +7,13 @@ import {
   RemindersToday,
   RemindersWeek,
 } from './CaregiverReminders';
+import { PatientGreeting } from './PatientGreeting';
 import { PatientReminders } from './PatientReminders';
 
 export default defineFeatureUi({
   widgets: [
+    // Patient, top to bottom: greeting (0), then the morning paper (good-news, 1), then the reminder card (10).
+    { id: 'reminders-greeting', role: 'patient', order: 0, Component: PatientGreeting },
     { id: 'reminders', role: 'patient', order: 10, Component: PatientReminders },
     // Caregiver page sections: missed/review alerts, today, manage, week graph, activity log.
     {
