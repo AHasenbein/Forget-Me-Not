@@ -65,9 +65,11 @@ export function PatientPaper() {
 
   if (failed)
     return (
-      <Card>
-        <AppText tone="muted">Today’s paper is not ready yet.</AppText>
-      </Card>
+      <View style={COLUMN}>
+        <Card>
+          <AppText tone="muted">Today’s paper is not ready yet.</AppText>
+        </Card>
+      </View>
     );
   if (!paper) return null;
 
@@ -75,17 +77,19 @@ export function PatientPaper() {
   const current = pages[page]!;
   return (
     <>
-      <Card>
-        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
-          <Icon name="flower" size={32} />
-          <AppText variant="title">Today’s paper</AppText>
-        </View>
-        <BigButton
-          tone="ghost"
-          label={page > 0 ? 'Keep reading' : 'Read today’s paper'}
-          onPress={() => setOpen(true)}
-        />
-      </Card>
+      <View style={COLUMN}>
+        <Card>
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
+            <Icon name="flower" size={32} />
+            <AppText variant="title">Today’s paper</AppText>
+          </View>
+          <BigButton
+            tone="ghost"
+            label={page > 0 ? 'Keep reading' : 'Read today’s paper'}
+            onPress={() => setOpen(true)}
+          />
+        </Card>
+      </View>
 
       <Modal visible={open} animationType="fade" onRequestClose={close}>
         <View style={{ flex: 1, backgroundColor: palette.bg }}>
@@ -150,6 +154,9 @@ export function PatientPaper() {
     </>
   );
 }
+
+/** Same column as the greeting and the reminder card, so the patient's screen lines up. */
+const COLUMN = { width: '100%', maxWidth: 640, alignSelf: 'center' } as const;
 
 function PageBody({ page }: { page: Page }) {
   if (page.kind === 'message')

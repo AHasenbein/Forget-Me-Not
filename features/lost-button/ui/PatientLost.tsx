@@ -60,11 +60,6 @@ export function PatientLost() {
           <BigButton tone="ghost" label="I’m lost" busy={busy} onPress={press} />
         </View>
       )}
-      {!alert ? (
-        <AppText variant="small" tone="muted" center>
-          Tap if you need help. Your caregiver will be told.
-        </AppText>
-      ) : null}
       {problem ? (
         <Card tone="danger">
           <AppText center>{problem}</AppText>
