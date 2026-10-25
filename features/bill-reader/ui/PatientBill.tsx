@@ -4,7 +4,7 @@ import { ApiError } from '@core/client/api';
 import { useSession } from '@core/client/session';
 import { AppText, BigButton, Card, Icon } from '@core/design-system/components';
 import type { WidgetProps } from '@core/feature-registry/ui';
-import { palette } from '@core/design-system/tokens';
+import { palette, radius } from '@core/design-system/tokens';
 import { SAMPLE_BILLS } from '../demo/samples';
 import { BillCamera } from './BillCamera';
 import { chooseImageWeb, type Frame } from './image';
@@ -94,7 +94,10 @@ export function PatientBill({ collapsed = false }: WidgetProps) {
   return (
     <View style={{ width: '100%', maxWidth: 640, alignSelf: 'center', gap: 12 }}>
       {step === 'closed' ? (
-        <BigButton tone="ghost" label="Scan bill" onPress={() => setStep('choose')} />
+        // A paler blue than the shell's "Before I pay" button, so it reads as one of its options.
+        <View style={{ backgroundColor: '#EDF4FC', borderRadius: radius.md }}>
+          <BigButton tone="ghost" label="Scan bill" onPress={() => setStep('choose')} />
+        </View>
       ) : null}
 
       {step === 'choose' ? (

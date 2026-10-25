@@ -9,8 +9,8 @@ const lazy = (name: Handler) => async (c: RouteContext) => (await import('./rout
 
 /**
  * Morning paper: the first thing the patient sees is a short "newspaper" of gentle good news, opened by a message from
- * the caregiver (if they left one). Stories come from an allowlist of good-news RSS feeds (GOOD_NEWS_LIVE_FEEDS=on) or
- * canned demo stories, filtered for anything distressing.
+ * the caregiver (if they left one). Stories come from an allowlist of good-news RSS feeds (on by default) or canned demo
+ * stories (GOOD_NEWS_LIVE_FEEDS=off), filtered for anything distressing.
  */
 export default defineFeature({
   name: 'good-news',
@@ -53,7 +53,7 @@ export default defineFeature({
   permissions: ['good_news.read', 'good_news.message'],
   events: { emits: [], consumes: [] },
   migrations: ['good-news__202610250100_init.sql'],
-  env: { GOOD_NEWS_LIVE_FEEDS: z.enum(['on', 'off']).default('off') },
+  env: { GOOD_NEWS_LIVE_FEEDS: z.enum(['on', 'off']).default('on') },
   demoSeed: async ({ world }) => {
     (await import('./demo/seed')).seedGoodNews(world);
   },

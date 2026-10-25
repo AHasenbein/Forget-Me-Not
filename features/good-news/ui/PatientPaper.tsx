@@ -1,8 +1,8 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useEffect, useState } from 'react';
-import { Modal, ScrollView, View } from 'react-native';
+import { Linking, Modal, ScrollView, View } from 'react-native';
 import { useSession } from '@core/client/session';
-import { AppText, BigButton, Card, Icon, ProgressDots } from '@core/design-system/components';
+import { AppText, BigButton, Card, ProgressDots } from '@core/design-system/components';
 import { palette } from '@core/design-system/tokens';
 import { buildPages, clampPage, dateLine, readProgress, type Page, type Paper } from './model';
 
@@ -65,9 +65,11 @@ export function PatientPaper() {
 
   if (failed)
     return (
-      <Card>
-        <AppText tone="muted">Today’s paper is not ready yet.</AppText>
-      </Card>
+      <View style={COLUMN}>
+        <Card>
+          <AppText tone="muted">Today’s paper is not ready yet.</AppText>
+        </Card>
+      </View>
     );
   if (!paper) return null;
 
@@ -75,17 +77,16 @@ export function PatientPaper() {
   const current = pages[page]!;
   return (
     <>
-      <Card>
-        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
-          <Icon name="flower" size={32} />
+      <View style={COLUMN}>
+        <Card>
           <AppText variant="title">Today’s paper</AppText>
-        </View>
-        <BigButton
-          tone="ghost"
-          label={page > 0 ? 'Keep reading' : 'Read today’s paper'}
-          onPress={() => setOpen(true)}
-        />
-      </Card>
+          <BigButton
+            tone="ghost"
+            label={page > 0 ? 'Keep reading' : 'Read today’s paper'}
+            onPress={() => setOpen(true)}
+          />
+        </Card>
+      </View>
 
       <Modal visible={open} animationType="fade" onRequestClose={close}>
         <View style={{ flex: 1, backgroundColor: palette.bg }}>
@@ -151,6 +152,9 @@ export function PatientPaper() {
   );
 }
 
+/** Same column as the greeting and the reminder card, so the patient's screen lines up. */
+const COLUMN = { width: '100%', maxWidth: 640, alignSelf: 'center' } as const;
+
 function PageBody({ page }: { page: Page }) {
   if (page.kind === 'message')
     return (
@@ -187,6 +191,13 @@ function PageBody({ page }: { page: Page }) {
       <AppText variant="small" tone="muted">
         From {page.source}
       </AppText>
+      {page.url ? (
+        <BigButton
+          tone="ghost"
+          label="Read the whole story"
+          onPress={() => void Linking.openURL(page.url!).catch(() => undefined)}
+        />
+      ) : null}
     </>
   );
 }

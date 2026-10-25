@@ -15,6 +15,15 @@ const paper = (message: boolean, stories: number) => ({
 });
 
 describe('paper view model', () => {
+  it('carries the story link through, and no link when the API sends none', () => {
+    const p = paper(false, 2);
+    p.stories[0] = { ...p.stories[0]!, url: 'https://positive.news/a/' } as (typeof p.stories)[0];
+    expect(buildPages(p).map((pg) => (pg.kind === 'story' ? pg.url : 'x'))).toEqual([
+      'https://positive.news/a/',
+      null,
+    ]);
+  });
+
   it('puts the message first, then one story per page, and never has zero pages', () => {
     expect(buildPages(paper(true, 2)).map((p) => p.kind)).toEqual(['message', 'story', 'story']);
     expect(buildPages(paper(false, 1)).map((p) => p.kind)).toEqual(['story']);

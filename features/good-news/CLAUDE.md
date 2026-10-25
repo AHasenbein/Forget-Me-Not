@@ -19,11 +19,13 @@ Routes under `/api/good-news` (patient = P, caregiver = C):
 
 ## Where the stories come from
 
-`GOOD_NEWS_LIVE_FEEDS=on` reads a fixed allowlist of good-news RSS feeds (`constants.ts`: Good News Network, Positive
-News, Reasons to be Cheerful, The Optimist Daily). "Scraping" means these feeds, never arbitrary sites or client URLs.
-Off (default): canned fictional stories in demo, none in live (canned stories must never pass for real news).
-Hardening: 8 s timeout, 1.5 MB cap, 25 items per feed, plain text only (HTML/entities/footers/bylines stripped), no links
-or images. **Safety filter** (`filter.ts`): drops anything about death, illness, disasters, crime, politics, protest,
+By default (demo and live) the paper reads a fixed allowlist of good-news RSS feeds (`constants.ts`: Good News Network,
+Positive News, Reasons to be Cheerful, The Optimist Daily). "Scraping" means these feeds, never arbitrary sites or client
+URLs. `GOOD_NEWS_LIVE_FEEDS=off`: canned fictional stories in demo, none in live (canned stories must never pass for real
+news). Hardening: 8 s timeout, 1.5 MB cap, 25 items per feed, plain text only (HTML/entities/footers/bylines stripped), no
+images. **Links**: each real story keeps its `url` ("Read the whole story" opens it), only if https and on the feed's own
+domain (`safeLink` in `rss.ts`); canned stories never get one. The filter only sees the headline and summary, not the
+article page the link opens. **Safety filter** (`filter.ts`): drops anything about death, illness, disasters, crime, politics, protest,
 emergencies, podcasts... Fewer stories beats one upsetting story. Keeps stories from the last 4 days, de-duplicates, mixes
 publishers, max 6 pages.
 
@@ -54,7 +56,7 @@ closes it. Big text, plain words ("This morning", never a clock time for the mes
 
 offline / feeds down (canned in demo, last paper or "No news today" in live) · distressing content in "good" feeds
 (filter) · malformed or huge feeds · stale caregiver message (24 h) · message replaced while reading (shown on next load) ·
-repeated taps (BigButton debounce) · session expiry (calm "not ready yet" line) · storage blocked (just doesn't remember).
+malicious or off-site story links (dropped) · repeated taps (BigButton debounce) · session expiry (calm "not ready yet" line) · storage blocked (just doesn't remember).
 
 ## Next steps
 

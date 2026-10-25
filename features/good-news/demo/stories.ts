@@ -6,7 +6,7 @@ const SUMMARIES = [
   'Tulips and daffodils are blooming along the paths. The gardeners say it is the most colourful spring in years.',
   'The choir has been practising favourite old songs. Everyone is welcome to come and sing along.',
 ];
-const EXTRA: Omit<Story, 'id' | 'publishedAt'>[] = [
+const EXTRA: Omit<Story, 'id' | 'publishedAt' | 'url'>[] = [
   {
     headline: 'A family of ducks crosses Main Street, and traffic stops to let them pass',
     summary:
@@ -38,5 +38,6 @@ export function cannedStories(now: Date, worldHeadlines: readonly string[]): Sto
     ...s,
     id: `demo-${i + 1}`,
     publishedAt: at(i + 1),
+    url: null, // fictional: never a real-looking link
   }));
 }

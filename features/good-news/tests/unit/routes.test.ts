@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { buildDemoWorld, seedDemo } from '@core/demo';
 import { createApp } from '@core/server/app';
 import {
@@ -35,7 +35,14 @@ beforeEach(() => {
   clock.setTime('2026-10-25T09:00:00Z');
   resetRuntime({
     source: createCannedSource(() => [
-      { id: 's1', headline: 'Ducks cross the road', summary: '', source: 'S', publishedAt: null },
+      {
+        id: 's1',
+        headline: 'Ducks cross the road',
+        summary: '',
+        source: 'S',
+        publishedAt: null,
+        url: null,
+      },
     ]),
     fallback: null,
     now: clock.now,
@@ -97,7 +104,36 @@ describe('good-news routes', () => {
 });
 
 describe('demo mode', () => {
+  afterEach(() => {
+    vi.unstubAllEnvs();
+    vi.unstubAllGlobals();
+  });
+
+  it('reads the real feeds by default, with links to the full stories (network stubbed)', async () => {
+    vi.stubEnv('GOOD_NEWS_LIVE_FEEDS', undefined);
+    vi.stubGlobal('fetch', async (url: string) => {
+      const host = new URL(url).origin;
+      return new Response(
+        `<rss><channel><item><title>Kind neighbour fixes bikes at ${host}</title><link>${host}/bikes/</link><pubDate>${new Date(clock.now().getTime() - 3_600_000).toUTCString()}</pubDate></item></channel></rss>`,
+      );
+    });
+    resetRuntime({ now: clock.now });
+    const world = buildDemoWorld(clock.now());
+    const demoApp = createApp({
+      manifests: [manifest],
+      verifier: fakeVerifier([world.patient]),
+      env: { DATA_MODE: 'demo', FEATURE_ALL: 'on' },
+    });
+    const paper = await (
+      await demoApp.request('/api/good-news/paper', { headers: bearer(world.patient) })
+    ).json();
+    expect(paper.editionId).toContain('-feeds-');
+    expect(paper.stories.length).toBeGreaterThan(0);
+    for (const s of paper.stories) expect(s.url).toMatch(/^https:\/\/[^/]+\/bikes\/$/);
+  });
+
   it('demoSeed leaves a caregiver note and canned stories; idempotent', async () => {
+    vi.stubEnv('GOOD_NEWS_LIVE_FEEDS', 'off'); // no network in tests
     resetRuntime({ now: clock.now }); // real demo wiring: canned stories, canned fallback
     const world = buildDemoWorld(clock.now());
     const env = { DATA_MODE: 'demo', FEATURE_ALL: 'on' };
@@ -113,6 +149,7 @@ describe('demo mode', () => {
     const paper = await (await get(world.patient)).json();
     expect(paper.message.text).toContain(world.profile.firstName);
     expect(paper.stories.length).toBeGreaterThan(3);
+    expect(paper.stories.every((s: { url: unknown }) => s.url === null)).toBe(true); // fictional: no links
     expect((await get(world.friend)).status).toBe(403);
   });
 });

@@ -27,7 +27,7 @@ export function getStore(): MemoryMessageStore {
 }
 
 /**
- * Source: the real feeds when GOOD_NEWS_LIVE_FEEDS=on, otherwise canned stories in demo (none in live: canned stories
+ * Source: the real feeds unless GOOD_NEWS_LIVE_FEEDS=off, then canned stories in demo (none in live: canned stories
  * must never pass for real news). The canned fallback, used when the feeds fail, exists only in demo mode.
  */
 export function getService(): GoodNewsService {
@@ -35,7 +35,7 @@ export function getService(): GoodNewsService {
     store: getStore(),
     source:
       overrides.source ??
-      (process.env.GOOD_NEWS_LIVE_FEEDS === 'on'
+      (process.env.GOOD_NEWS_LIVE_FEEDS !== 'off'
         ? createFeedSource({ fetch: (...a) => fetch(...a) })
         : isDemo()
           ? canned
