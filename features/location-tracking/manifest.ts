@@ -1,5 +1,5 @@
 import { defineFeature } from '@core/feature-registry/manifest';
-import { ingestSchema } from './server/schema';
+import { emptySchema, ingestSchema } from './server/schema';
 
 /**
  * Manifest for `location-tracking`. Auto-discovered: never edit a shared router/nav/config to add it.
@@ -28,6 +28,26 @@ export default defineFeature({
       path: '/views',
       access: { roles: ['primary_caregiver'] },
       handler: async (ctx) => (await import('./server/handlers')).getViews(ctx),
+    },
+    {
+      method: 'POST',
+      path: '/find',
+      access: { roles: ['primary_caregiver'] },
+      input: emptySchema,
+      handler: async (ctx) => (await import('./server/handlers')).startFind(ctx),
+    },
+    {
+      method: 'POST',
+      path: '/find/stop',
+      access: { roles: ['primary_caregiver', 'patient'] },
+      input: emptySchema,
+      handler: async (ctx) => (await import('./server/handlers')).stopFind(ctx),
+    },
+    {
+      method: 'GET',
+      path: '/find',
+      access: { roles: ['primary_caregiver', 'patient'] },
+      handler: async (ctx) => (await import('./server/handlers')).getFind(ctx),
     },
   ],
   nav: [],

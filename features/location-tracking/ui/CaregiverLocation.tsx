@@ -6,6 +6,7 @@ import { useSession } from '@core/client/session';
 import { AppText, BigButton, Card, Icon, Row } from '@core/design-system/components';
 import { palette } from '@core/design-system/tokens';
 import type { LocationReading } from '@contracts/location';
+import { FindThem } from './FindThem';
 import { caregiverError, lastSeenLine, mapsUrl, viewLabel, viewTime, type ViewRow } from './model';
 
 const BASE = '/api/location-tracking';
@@ -90,6 +91,7 @@ export function CaregiverLocation() {
         </>
       )}
       {problem ? <AppText tone="danger">{problem}</AppText> : null}
+      <FindThem />
 
       <View style={{ gap: 8, borderTopWidth: 1, borderTopColor: palette.border, paddingTop: 16 }}>
         <AppText variant="small" bold>

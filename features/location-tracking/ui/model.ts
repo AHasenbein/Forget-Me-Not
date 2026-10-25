@@ -30,11 +30,13 @@ const WHO: Record<string, string> = {
   caregiver_view: 'Caregiver',
   circle_view: 'Family member',
   lost_button: 'Lost-button alert',
+  find_session: 'Started a find-them session',
   safezone_eval: 'Safe-zone check',
 };
 
 /** One row of the "who looked" list, in plain words. Unknown purposes fall back safely. */
 export function viewLabel(row: Pick<ViewRow, 'purpose' | 'outcome'>): string {
+  if (row.purpose === 'find_session') return 'Started a find-them session';
   const who = WHO[row.purpose] ?? 'Someone';
   switch (row.outcome) {
     case 'denied':
