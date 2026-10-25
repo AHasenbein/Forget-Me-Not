@@ -77,16 +77,20 @@ describe('DASHBOARD_LAYOUT', () => {
     expect([...placed].sort()).toEqual(SECTIONS.map((s) => s.id).sort());
   });
 
-  it('3 columns: two full rows, the "needs you" box two columns wide', () => {
+  it('3 columns: two rows of three, "Worth knowing" inside the "needs you" box', () => {
     expect(ids(rowsFor(3))).toEqual([
       ['today', 'manage', 'where'],
-      ['alerts', 'week'],
+      ['alerts', 'messages', 'week'],
     ]);
-    expect(rowsFor(3)[1]?.[0]).toMatchObject({ id: 'alerts', span: 2, with: ['activity'] });
+    expect(rowsFor(3)[1]?.[0]).toMatchObject({ id: 'alerts', with: ['activity'] });
   });
 
   it('every row is full at any width (a later narrow box fills a gap, order otherwise kept)', () => {
-    expect(ids(rowsFor(2))).toEqual([['today', 'manage'], ['where', 'week'], ['alerts']]);
+    expect(ids(rowsFor(2))).toEqual([
+      ['today', 'manage'],
+      ['where', 'alerts'],
+      ['messages', 'week'],
+    ]);
     for (const n of [1, 2, 3, 4, 5]) {
       const rows = rowsFor(n);
       const full = Math.min(
@@ -96,7 +100,7 @@ describe('DASHBOARD_LAYOUT', () => {
       for (const r of rows.slice(0, -1)) expect(r.reduce((t, c) => t + c.span, 0)).toBe(full);
       expect(rows.flat()).toHaveLength(DASHBOARD_LAYOUT.cells.length);
     }
-    expect(rowsFor(1)).toHaveLength(5);
+    expect(rowsFor(1)).toHaveLength(6);
   });
 });
 

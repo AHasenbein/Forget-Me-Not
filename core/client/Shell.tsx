@@ -316,8 +316,8 @@ function NeedsYou({
 
 /**
  * Caregiver dashboard: the stats strip, then full rows of boxes on one column grid, each row's boxes the same height:
- * Today, Reminders, Location; then the "needs you" box (with Worth knowing, two columns wide) and This week (on narrower
- * windows: rows of two, the "needs you" box last at full width; see `rowsFor`). The box's status banner says whether anything
+ * Today, Reminders, Location; then the "needs you" box (with Worth knowing), Messages (the morning paper note) and
+ * This week (rows of two on narrower windows; see `rowsFor`). The box's status banner says whether anything
  * needs you (widgets report through `useAttention`; it never says "all clear" while something is loading or failed),
  * with the open alert cards under it. It is an ordinary app UI (`standard` density: normal type and controls; Text size is for the
  * patient only). The page scrolls a little on small windows instead of shrinking.

@@ -36,6 +36,7 @@ export const SECTIONS: readonly { id: DashboardSection; label: string }[] = [
   { id: 'today', label: 'Today' },
   { id: 'activity', label: 'Worth knowing' },
   { id: 'manage', label: 'Reminders' },
+  { id: 'messages', label: 'Messages' },
   { id: 'where', label: 'Location' },
   { id: 'week', label: 'Week' },
 ];
@@ -60,8 +61,9 @@ export interface GridCell {
 
 /**
  * Wide-screen dashboard, top to bottom: `top` spans the full width (the stats strip); then a grid of boxes in reading
- * order. The "needs you" box holds "Worth knowing" too and spans two columns, so every row is full and even. Every box in
- * a row is as tall as the tallest one, so the bottoms line up. Every section appears exactly once (tested).
+ * order: two rows of three (Today, Reminders, Location / Needs you, Messages, This week). The "needs you" box holds
+ * "Worth knowing" too. Every box in a row is as tall as the tallest one, so the bottoms line up. Every section appears
+ * exactly once (tested).
  */
 export const DASHBOARD_LAYOUT: { top: readonly DashboardSection[]; cells: readonly GridCell[] } = {
   top: ['summary'],
@@ -69,15 +71,16 @@ export const DASHBOARD_LAYOUT: { top: readonly DashboardSection[]; cells: readon
     { id: 'today', span: 1 },
     { id: 'manage', span: 1 },
     { id: 'where', span: 1 },
-    { id: 'alerts', span: 2, with: ['activity'] },
+    { id: 'alerts', span: 1, with: ['activity'] },
+    { id: 'messages', span: 1 },
     { id: 'week', span: 1 },
   ],
 };
 
 /**
  * Rows for a given number of columns, each row full: boxes in reading order, but a wide box that does not fit the rest
- * of a row waits for the next one while a later narrow box fills the gap (3 columns: Today, Reminders, Location / Needs
- * you (2), This week; 2 columns: Today, Reminders / Location, This week / Needs you).
+ * of a row waits for the next one while a later narrow box fills the gap. Today every box is one column wide, so this is
+ * simply rows of `columns` boxes in reading order.
  */
 export function rowsFor(columns: number): GridCell[][] {
   const n = Math.max(1, columns);

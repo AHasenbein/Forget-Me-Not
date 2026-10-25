@@ -22,7 +22,7 @@ export interface Widget {
  * plain lines, no Card of their own.
  */
 export type DashboardSection =
-  'summary' | 'alerts' | 'today' | 'manage' | 'week' | 'where' | 'activity';
+  'summary' | 'alerts' | 'today' | 'manage' | 'messages' | 'week' | 'where' | 'activity';
 
 /** Groups let features share one button without importing each other (e.g. money-check + bill-reader behind "Before I pay"). */
 export type WidgetGroup = 'before-i-pay';
