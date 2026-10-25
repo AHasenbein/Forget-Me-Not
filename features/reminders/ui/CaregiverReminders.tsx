@@ -1,6 +1,7 @@
 import { useState } from 'react';
-import { Image, StyleSheet, useWindowDimensions, View } from 'react-native';
+import { Image, StyleSheet, View } from 'react-native';
 import { ApiError } from '@core/client/api';
+import { useAttention } from '@core/client/attention';
 import { daysLabel, formatTime } from '@core/client/format';
 import { usePoll } from '@core/client/hooks';
 import { useSession } from '@core/client/session';
@@ -11,23 +12,19 @@ import {
   Card,
   Chip,
   Field,
-  Hero,
-  Icon,
   IconCircle,
   Row,
-  Segmented,
-  Stack,
-  Ledger,
 } from '@core/design-system/components';
 import { palette } from '@core/design-system/tokens';
 import type { ReminderKind, Schedule } from '../schemas';
-import { REMINDER_KINDS } from '../schemas';
+import { LABEL_MAX, REMINDER_KINDS } from '../schemas';
 import {
   caregiverCounts,
   caregiverError,
   caregiverRows,
   type CaregiverRow,
   adherencePercent,
+  attentionReport,
   auditLabel,
   dateLabelFor,
   type DayBar,
@@ -35,6 +32,7 @@ import {
   untilLabel,
   weekStrip,
   KIND,
+  labelOf,
   normalizeTime,
   type OccurrenceView,
   type TodayResponse,
@@ -55,60 +53,62 @@ interface History {
   summary: { confirmed: number; missed: number; skipped: number };
 }
 
-export function CaregiverReminders() {
-  const { api, token } = useSession();
-  const today = usePoll(() => api<TodayResponse>('GET', `${BASE}/today`), 2000, [token]);
-  const schedules = usePoll(() => api<Schedule[]>('GET', `${BASE}/schedules`), 4000, [token]);
-  const audit = usePoll(() => api<AuditRow[]>('GET', `${BASE}/audit`), 10000, [token]);
-  const history = usePoll(() => api<History>('GET', `${BASE}/history?days=7`), 8000, [token]);
+/**
+ * The caregiver reminders UI is six small dashboard widgets (one per page section) instead of one big widget with
+ * its own tabs: alerts, summary strip, today, manage, week graph, activity log. Each polls only what it shows.
+ */
+
+/** One request at a time, then refresh; errors in plain words. */
+function useCaller(refresh: () => void) {
+  const { api } = useSession();
   const [problem, setProblem] = useState('');
   const [busyId, setBusyId] = useState<string | null>(null);
-  const [kind, setKind] = useState<ReminderKind>('pill');
-  const [time, setTime] = useState('');
-  const [confirmDelete, setConfirmDelete] = useState<string | null>(null);
-  const [section, setSection] = useState<Section>('today');
-  const [photos, setPhotos] = useState<Record<string, PhotoSet>>({});
-
-  const refresh = () => {
-    today.reload();
-    schedules.reload();
-    history.reload();
-    audit.reload();
-  };
+  /** True when the request went through. */
   const call = async (id: string, method: string, path: string, body?: unknown) => {
-    if (busyId) return;
+    if (busyId) return false;
     setBusyId(id);
     setProblem('');
     try {
       await api(method, `${BASE}${path}`, body);
       refresh();
+      return true;
     } catch (e) {
       setProblem(caregiverError(e instanceof ApiError ? e.code : 'offline'));
+      return false;
     } finally {
       setBusyId(null);
     }
   };
+  return { call, problem, setProblem, busyId };
+}
 
+function Problem({ text }: { text: string }) {
+  return text ? (
+    <Card tone="danger">
+      <AppText>{text}</AppText>
+    </Card>
+  ) : null;
+}
+
+/** Alerts: pill photos to review and missed reminders. Renders nothing when all is well. */
+export function RemindersAttention() {
+  const { api, token } = useSession();
+  const today = usePoll(() => api<TodayResponse>('GET', `${BASE}/today`), 2000, [token]);
+  const { call, problem, setProblem, busyId } = useCaller(() => today.reload());
+  const [photos, setPhotos] = useState<Record<string, PhotoSet>>({});
   const rows = caregiverRows(today.data?.occurrences ?? [], formatTime);
-  const counts = caregiverCounts(rows);
   const attention = rows.filter((r) => r.needsAttention);
-  const list: Schedule[] = schedules.data ?? [];
-  const tz = list[0]?.timeZone ?? Intl.DateTimeFormat().resolvedOptions().timeZone;
-  const hhmm = normalizeTime(time);
-
-  const markDone = (o: OccurrenceView) => call(o.id, 'POST', `/occurrences/${o.id}/confirm`);
   const reviews = rows.filter((r) => r.needsReview);
+  useAttention(!today.data && !today.error ? null : attentionReport(rows, today.error !== null));
+  const markDone = (o: OccurrenceView) => call(o.id, 'POST', `/occurrences/${o.id}/confirm`);
   const viewPhotos = async (id: string) => {
     if (busyId) return;
-    setBusyId(id);
     setProblem('');
     try {
       const got = await api<PhotoSet>('GET', `${BASE}/occurrences/${id}/frames`);
       setPhotos((p) => ({ ...p, [id]: got }));
     } catch (e) {
       setProblem(caregiverError(e instanceof ApiError ? e.code : 'offline'));
-    } finally {
-      setBusyId(null);
     }
   };
   const review = async (id: string, decision: 'approve' | 'reject') => {
@@ -118,64 +118,7 @@ export function CaregiverReminders() {
       return rest;
     });
   };
-
-  const nextItem = nextUp(today.data?.occurrences ?? []);
-  const week = history.data
-    ? weekStrip(history.data.occurrences, today.data?.now ?? new Date().toISOString(), tz)
-    : null;
-  const pct = history.data ? adherencePercent(history.data.summary) : null;
-  const wide = useWindowDimensions().width >= 1000;
-  const allClear = !today.error && counts.attention === 0 && reviews.length === 0;
-
-  const heroEl =
-    today.error && !today.data ? (
-      <Card tone="danger">
-        <AppText>{caregiverError(today.error.code)}</AppText>
-      </Card>
-    ) : (
-      <Hero>
-        <View style={{ gap: 6 }}>
-          <AppText variant="small" tone="inverseMuted">
-            Today · {today.data ? dateLabelFor(today.data.now, tz) : ''}
-          </AppText>
-          <Row gap={14}>
-            <Icon
-              name={allClear ? 'check' : 'alert'}
-              size={40}
-              color={allClear ? palette.sunflower : '#FFB4BF'}
-            />
-            <AppText variant="huge" tone="inverse">
-              {allClear ? 'All on track' : `${counts.attention + reviews.length} to look at`}
-            </AppText>
-          </Row>
-          <AppText variant="small" tone="inverseMuted">
-            {history.data
-              ? `Last ${history.data.days} days: ${history.data.summary.confirmed} done, ${history.data.summary.missed} missed, ${history.data.summary.skipped} skipped`
-              : 'Checking in…'}
-          </AppText>
-        </View>
-        {nextItem && today.data ? (
-          <AppText variant="small" tone="inverseMuted">
-            Next: {KIND[nextItem.kind].label} {untilLabel(today.data.now, nextItem.dueAt)} (
-            {formatTime(nextItem.dueAt, nextItem.timeZone)})
-          </AppText>
-        ) : null}
-        <Ledger
-          inverse
-          items={[
-            { value: counts.done, label: 'done' },
-            { value: counts.upcoming, label: 'coming up' },
-            {
-              value: counts.attention,
-              label: 'need attention',
-              tone: counts.attention ? 'danger' : 'neutral',
-            },
-          ]}
-        />
-      </Hero>
-    );
-  const weekEl = week ? <WeekCard week={week} pct={pct} /> : null;
-  const alerts = (
+  return (
     <>
       {reviews.map((r) => (
         <ReviewCard
@@ -188,208 +131,344 @@ export function CaregiverReminders() {
         />
       ))}
 
-      {attention.map((r) => (
-        <Card key={r.occurrence.id} tone="danger">
-          <Row gap={14}>
-            <IconCircle icon={KIND[r.occurrence.kind].icon} size={36} tone="danger" />
-            <View style={{ flex: 1, minWidth: 180 }}>
-              <AppText variant="title" tone="danger">
-                {KIND[r.occurrence.kind].label} missed
-              </AppText>
-              <AppText variant="small" tone="muted">
-                Due {formatTime(r.occurrence.dueAt, r.occurrence.timeZone)}
-              </AppText>
-            </View>
-          </Row>
-          <AppText>
-            They haven’t confirmed.{' '}
-            {r.occurrence.kind === 'pill'
-              ? 'Only mark it done if you gave it to them yourself.'
-              : ''}
+      {attention.length ? (
+        <Card tone="danger">
+          <AppText variant="title" tone="danger">
+            {attention.length === 1 ? '1 reminder missed' : `${attention.length} reminders missed`}
           </AppText>
-          <BigButton
-            tone="primary"
-            label={r.occurrence.kind === 'pill' ? 'I gave it' : 'Mark done'}
-            busy={busyId === r.occurrence.id}
-            disabled={!!busyId}
-            onPress={() => markDone(r.occurrence)}
-          />
-        </Card>
-      ))}
-    </>
-  );
-  const main = (
-    <>
-      <Segmented options={SECTIONS} value={section} onChange={setSection} />
-
-      {section === 'today' ? (
-        <Card>
-          {rows.length === 0 ? <AppText tone="muted">Nothing scheduled for today.</AppText> : null}
-          {rows.map((r, i) => (
-            <View key={r.occurrence.id} style={[styles.rowItem, i > 0 && styles.rowDivider]}>
-              <IconCircle icon={KIND[r.occurrence.kind].icon} size={30} tone={r.tone} />
-              <View style={{ flex: 1, minWidth: 140, gap: 6 }}>
-                <AppText bold>{KIND[r.occurrence.kind].label}</AppText>
-                {r.occurrence.snoozeCount ? (
-                  <AppText variant="small" tone="muted">
-                    Snoozed {r.occurrence.snoozeCount}×
-                  </AppText>
-                ) : null}
-                <Row gap={6}>
-                  <Badge label={r.status} tone={r.tone} />
-                  {r.check ? <Badge label={r.check.label} tone={r.check.tone} /> : null}
-                </Row>
-              </View>
-              {r.canMarkDone && !r.needsAttention ? (
-                <Chip label="Mark done" onPress={() => void markDone(r.occurrence)} />
-              ) : null}
-            </View>
-          ))}
-        </Card>
-      ) : null}
-
-      {section === 'schedules' ? (
-        <Card>
-          {list.length === 0 ? <AppText tone="muted">No reminders set up yet.</AppText> : null}
-          {list.map((s, i) => (
-            <View key={s.id} style={[{ gap: 10 }, i > 0 && styles.rowDivider]}>
-              <View style={styles.rowItem}>
-                <IconCircle icon={KIND[s.kind].icon} size={30} />
-                <View style={{ flex: 1, minWidth: 140 }}>
-                  <AppText bold>
-                    {KIND[s.kind].label} · {formatTime(`2026-01-01T${s.localTime}:00Z`, 'UTC')}
-                  </AppText>
-                  <AppText variant="small" tone="muted">
-                    {daysLabel(s.daysOfWeek)}
-                  </AppText>
-                </View>
-                {s.paused ? <Badge label="Paused" tone="warn" /> : null}
-              </View>
-              <Row gap={8}>
-                <Chip
-                  label={s.paused ? 'Resume' : 'Pause'}
-                  onPress={() =>
-                    void call(s.id, 'PATCH', `/schedules/${s.id}`, { paused: !s.paused })
-                  }
-                />
-                <Chip
-                  label={confirmDelete === s.id ? 'Tap again to delete' : 'Delete'}
-                  selected={confirmDelete === s.id}
-                  onPress={() => {
-                    if (confirmDelete !== s.id) return setConfirmDelete(s.id);
-                    setConfirmDelete(null);
-                    void call(s.id, 'DELETE', `/schedules/${s.id}`);
-                  }}
-                />
-              </Row>
-            </View>
-          ))}
-        </Card>
-      ) : null}
-
-      {section === 'activity' ? (
-        <Card>
-          <AppText variant="title">Activity log</AppText>
           <AppText variant="small" tone="muted">
-            Sensitive actions are recorded here so you can always see who looked at what.
+            They haven’t confirmed. Only mark a pill done if you gave it to them yourself.
           </AppText>
-          {(audit.data ?? []).length === 0 ? (
-            <AppText tone="muted">Nothing has been recorded yet.</AppText>
-          ) : null}
-          {(audit.data ?? []).map((a, i) => (
-            <View key={a.id} style={[styles.rowItem, i > 0 && styles.rowDivider]}>
-              <IconCircle icon={a.action === 'pill_frames_viewed' ? 'camera' : 'check'} size={30} />
-              <View style={{ flex: 1, minWidth: 140 }}>
-                <AppText>{auditLabel(a.action)}</AppText>
+          {attention.map((r, i) => (
+            <View key={r.occurrence.id} style={[styles.rowItem, i > 0 && styles.rowDivider]}>
+              <IconCircle icon={KIND[r.occurrence.kind].icon} size={30} tone="danger" />
+              <View style={{ flex: 1, minWidth: 100 }}>
+                <AppText bold>{labelOf(r.occurrence)}</AppText>
                 <AppText variant="small" tone="muted">
-                  {formatTime(a.at)}
+                  Due {formatTime(r.occurrence.dueAt, r.occurrence.timeZone)}
                 </AppText>
               </View>
+              <Chip
+                label={r.occurrence.kind === 'pill' ? 'I gave it' : 'Mark done'}
+                onPress={() => void markDone(r.occurrence)}
+              />
             </View>
           ))}
         </Card>
       ) : null}
-
-      {section === 'add' ? (
-        <Card>
-          <AppText variant="title">Add a reminder</AppText>
-          <Row gap={8}>
-            {REMINDER_KINDS.map((k) => (
-              <Chip
-                key={k}
-                label={KIND[k].label}
-                selected={k === kind}
-                onPress={() => setKind(k)}
-              />
-            ))}
-          </Row>
-          <Field
-            label="Time (e.g. 8:30 or 20:00)"
-            value={time}
-            onChangeText={setTime}
-            placeholder="e.g. 8:30"
-          />
-          {time && !hhmm ? (
-            <AppText variant="small" tone="danger">
-              That doesn’t look like a time.
-            </AppText>
-          ) : null}
-          <BigButton
-            label="Add reminder"
-            disabled={!hhmm || !!busyId}
-            busy={busyId === 'new'}
-            onPress={async () => {
-              await call('new', 'POST', '/schedules', { kind, localTime: hhmm, timeZone: tz });
-              setTime('');
-              setSection('schedules');
-            }}
-          />
-          <AppText variant="small" tone="muted">
-            Repeats every day · time zone {tz}
-          </AppText>
-        </Card>
-      ) : null}
-
-      {problem ? (
-        <Card tone="danger">
-          <AppText>{problem}</AppText>
-        </Card>
-      ) : null}
+      <Problem text={problem} />
     </>
-  );
-
-  return wide ? (
-    <View style={{ gap: 20 }}>
-      {heroEl}
-      <View style={{ flexDirection: 'row', gap: 20, alignItems: 'flex-start' }}>
-        <View style={{ flex: 1, gap: 20 }}>
-          {alerts}
-          {weekEl}
-        </View>
-        <View style={{ flex: 1.3, gap: 20 }}>{main}</View>
-      </View>
-    </View>
-  ) : (
-    <Stack>
-      {heroEl}
-      {alerts}
-      {weekEl}
-      {main}
-    </Stack>
   );
 }
 
-const SECTIONS = [
-  { id: 'today', label: 'Today' },
-  { id: 'schedules', label: 'Schedules' },
-  { id: 'activity', label: 'Activity' },
-  { id: 'add', label: 'Add' },
-] as const;
-type Section = (typeof SECTIONS)[number]['id'];
+/** One number in the stats strip. */
+function Stat({
+  value,
+  label,
+  tone = 'neutral',
+}: {
+  value: string | number;
+  label: string;
+  tone?: 'neutral' | 'danger' | 'success' | 'warn' | 'primary';
+}) {
+  return (
+    <View style={styles.stat}>
+      <AppText variant="huge" tone={tone === 'neutral' ? undefined : tone}>
+        {String(value)}
+      </AppText>
+      <AppText variant="small" tone="muted">
+        {label}
+      </AppText>
+    </View>
+  );
+}
+
+/**
+ * Stats strip under "needs you now": how today's reminders are going, at a glance. The overall "is everything OK"
+ * answer is the dashboard's status line, so this strip only covers reminders.
+ */
+export function RemindersSummary() {
+  const { api, token } = useSession();
+  const today = usePoll(() => api<TodayResponse>('GET', `${BASE}/today`), 2000, [token]);
+  const history = usePoll(() => api<History>('GET', `${BASE}/history?days=7`), 8000, [token]);
+  const schedules = usePoll(() => api<Schedule[]>('GET', `${BASE}/schedules`), 8000, [token]);
+  const rows = caregiverRows(today.data?.occurrences ?? [], formatTime);
+  const counts = caregiverCounts(rows);
+  const tz = schedules.data?.[0]?.timeZone ?? Intl.DateTimeFormat().resolvedOptions().timeZone;
+  const nextItem = nextUp(today.data?.occurrences ?? []);
+  const pct = history.data ? adherencePercent(history.data.summary) : null;
+  if (today.error && !today.data)
+    return (
+      <Card tone="danger">
+        <AppText>{caregiverError(today.error.code)}</AppText>
+      </Card>
+    );
+  return (
+    <View style={styles.strip}>
+      <View style={[styles.stat, styles.statWide]}>
+        <AppText variant="title">
+          {today.data ? dateLabelFor(today.data.now, tz) : 'Checking in…'}
+        </AppText>
+        <AppText variant="small" tone="muted">
+          Today’s reminders
+        </AppText>
+      </View>
+      <Stat value={counts.done} label="done today" tone="success" />
+      <Stat value={counts.upcoming} label="coming up" />
+      <Stat
+        value={counts.attention}
+        label="missed"
+        tone={counts.attention ? 'danger' : 'neutral'}
+      />
+      <Stat
+        value={pct === null ? '–' : `${pct}%`}
+        label="taken this week"
+        tone={pct !== null && pct < 70 ? 'warn' : 'primary'}
+      />
+      <View style={[styles.stat, styles.statWide]}>
+        <AppText variant="title">
+          {nextItem && today.data ? labelOf(nextItem) : 'Nothing next'}
+        </AppText>
+        <AppText variant="small" tone="muted">
+          {nextItem && today.data
+            ? `${untilLabel(today.data.now, nextItem.dueAt)} (${formatTime(nextItem.dueAt, nextItem.timeZone)})`
+            : 'next reminder'}
+        </AppText>
+      </View>
+    </View>
+  );
+}
+
+/** Today panel: today's reminders. */
+export function RemindersToday() {
+  const { api, token } = useSession();
+  const today = usePoll(() => api<TodayResponse>('GET', `${BASE}/today`), 2000, [token]);
+  const { call, problem } = useCaller(() => today.reload());
+  const rows = caregiverRows(today.data?.occurrences ?? [], formatTime);
+  return (
+    <>
+      <Card>
+        <AppText variant="title">Today</AppText>
+        {rows.length === 0 ? <AppText tone="muted">Nothing scheduled for today.</AppText> : null}
+        {rows.map((r, i) => (
+          <View key={r.occurrence.id} style={[styles.rowItem, i > 0 && styles.rowDivider]}>
+            <IconCircle icon={KIND[r.occurrence.kind].icon} size={30} tone={r.tone} />
+            <View style={{ flex: 1, minWidth: 140, gap: 6 }}>
+              <AppText bold>{labelOf(r.occurrence)}</AppText>
+              {r.occurrence.snoozeCount ? (
+                <AppText variant="small" tone="muted">
+                  Snoozed {r.occurrence.snoozeCount}×
+                </AppText>
+              ) : null}
+              <Row gap={6}>
+                <Badge label={r.status} tone={r.tone} />
+                {r.check ? <Badge label={r.check.label} tone={r.check.tone} /> : null}
+              </Row>
+            </View>
+            {r.canMarkDone && !r.needsAttention ? (
+              <Chip
+                label="Mark done"
+                onPress={() =>
+                  void call(r.occurrence.id, 'POST', `/occurrences/${r.occurrence.id}/confirm`)
+                }
+              />
+            ) : null}
+          </View>
+        ))}
+      </Card>
+      <Problem text={problem} />
+    </>
+  );
+}
+
+/** Reminders panel: the schedules (pause / delete) and the add form. */
+export function RemindersManage() {
+  const { api, token } = useSession();
+  const schedules = usePoll(() => api<Schedule[]>('GET', `${BASE}/schedules`), 4000, [token]);
+  const { call, problem, busyId } = useCaller(() => schedules.reload());
+  const [kind, setKind] = useState<ReminderKind>('pill');
+  const [time, setTime] = useState('');
+  const [words, setWords] = useState('');
+  const [adding, setAdding] = useState(false);
+  const [confirmDelete, setConfirmDelete] = useState<string | null>(null);
+  const list: Schedule[] = schedules.data ?? [];
+  const tz = list[0]?.timeZone ?? Intl.DateTimeFormat().resolvedOptions().timeZone;
+  const hhmm = normalizeTime(time);
+  const custom = kind === 'custom';
+  const wordsOk = !custom || words.trim().length >= 2;
+  const close = () => {
+    setAdding(false);
+    setTime('');
+    setWords('');
+  };
+  return (
+    <>
+      <Card>
+        <AppText variant="title">Reminders</AppText>
+        {list.length === 0 ? <AppText tone="muted">No reminders set up yet.</AppText> : null}
+        {list.map((s, i) => (
+          <View key={s.id} style={[styles.rowItem, i > 0 && styles.rowDivider]}>
+            <IconCircle icon={KIND[s.kind].icon} size={30} />
+            <View style={{ flex: 1, minWidth: 110 }}>
+              <AppText bold>
+                {labelOf(s)} · {formatTime(`2026-01-01T${s.localTime}:00Z`, 'UTC')}
+              </AppText>
+              <AppText variant="small" tone="muted">
+                {s.paused ? 'Paused · ' : ''}
+                {daysLabel(s.daysOfWeek)}
+              </AppText>
+            </View>
+            <Chip
+              label={s.paused ? 'Resume' : 'Pause'}
+              onPress={() => void call(s.id, 'PATCH', `/schedules/${s.id}`, { paused: !s.paused })}
+            />
+            <Chip
+              label={confirmDelete === s.id ? 'Tap again' : 'Delete'}
+              selected={confirmDelete === s.id}
+              onPress={() => {
+                if (confirmDelete !== s.id) return setConfirmDelete(s.id);
+                setConfirmDelete(null);
+                void call(s.id, 'DELETE', `/schedules/${s.id}`);
+              }}
+            />
+          </View>
+        ))}
+        {/* The add form stays folded until asked for: it is used rarely and the list is what you scan. */}
+        {adding ? (
+          <View style={[styles.rowDivider, { gap: 10 }]}>
+            <AppText bold>Add a reminder</AppText>
+            <Row gap={8}>
+              {REMINDER_KINDS.map((k) => (
+                <Chip
+                  key={k}
+                  label={KIND[k].label}
+                  selected={k === kind}
+                  onPress={() => setKind(k)}
+                />
+              ))}
+            </Row>
+            {custom ? (
+              <>
+                <Field
+                  label={`What should we remind them? (up to ${LABEL_MAX} letters)`}
+                  value={words}
+                  onChangeText={(t) => setWords(t.slice(0, LABEL_MAX))}
+                  placeholder="e.g. Water the plants"
+                />
+                <AppText variant="small" tone="muted">
+                  Shown on their screen in big letters. Keep it short and plain; their phone’s
+                  notification only says “Time for your reminder”.
+                </AppText>
+              </>
+            ) : null}
+            <Field
+              label="Time (e.g. 8:30 or 20:00)"
+              value={time}
+              onChangeText={setTime}
+              placeholder="e.g. 8:30"
+            />
+            {time && !hhmm ? (
+              <AppText variant="small" tone="danger">
+                That doesn’t look like a time.
+              </AppText>
+            ) : null}
+            <Row gap={8}>
+              <BigButton
+                label="Add reminder"
+                disabled={!hhmm || !wordsOk || !!busyId}
+                busy={busyId === 'new'}
+                onPress={async () => {
+                  const ok = await call('new', 'POST', '/schedules', {
+                    kind,
+                    ...(custom ? { label: words.trim() } : {}),
+                    localTime: hhmm,
+                    timeZone: tz,
+                  });
+                  if (ok) close(); // on a problem the form stays open with what they typed
+                }}
+              />
+              <BigButton tone="ghost" label="Cancel" onPress={close} />
+            </Row>
+            <AppText variant="small" tone="muted">
+              Repeats every day · time zone {tz}
+            </AppText>
+          </View>
+        ) : (
+          <BigButton tone="ghost" label="Add a reminder" onPress={() => setAdding(true)} />
+        )}
+      </Card>
+      <Problem text={problem} />
+    </>
+  );
+}
+
+/** Week: the 7-day graph. */
+export function RemindersWeek() {
+  const { api, token } = useSession();
+  const today = usePoll(() => api<TodayResponse>('GET', `${BASE}/today`), 4000, [token]);
+  const history = usePoll(() => api<History>('GET', `${BASE}/history?days=7`), 8000, [token]);
+  const schedules = usePoll(() => api<Schedule[]>('GET', `${BASE}/schedules`), 8000, [token]);
+  const tz = schedules.data?.[0]?.timeZone ?? Intl.DateTimeFormat().resolvedOptions().timeZone;
+  const week = history.data
+    ? weekStrip(history.data.occurrences, today.data?.now ?? new Date().toISOString(), tz)
+    : null;
+  const pct = history.data ? adherencePercent(history.data.summary) : null;
+  return week ? <WeekCard week={week} pct={pct} /> : null;
+}
+
+/** Activity: who looked at what (the audit log). Folded by default: it is for checking, not for every glance. */
+export function RemindersActivity() {
+  const { api, token } = useSession();
+  const audit = usePoll(() => api<AuditRow[]>('GET', `${BASE}/audit`), 10000, [token]);
+  const [open, setOpen] = useState(false);
+  const rows = audit.data ?? [];
+  return (
+    <Card>
+      <Row gap={8}>
+        <View style={{ flex: 1, minWidth: 200 }}>
+          <AppText variant="title">Activity log{rows.length ? ` (${rows.length})` : ''}</AppText>
+          <AppText variant="small" tone="muted">
+            Sensitive actions are recorded here so you can always see who looked at what.
+          </AppText>
+        </View>
+        {rows.length ? (
+          <Chip label={open ? 'Hide' : 'Show'} selected={open} onPress={() => setOpen((o) => !o)} />
+        ) : (
+          <AppText tone="muted">Nothing recorded yet.</AppText>
+        )}
+      </Row>
+      {(open ? rows : []).map((a, i) => (
+        <View key={a.id} style={[styles.rowItem, i > 0 && styles.rowDivider]}>
+          <IconCircle icon={a.action === 'pill_frames_viewed' ? 'camera' : 'check'} size={30} />
+          <View style={{ flex: 1, minWidth: 140 }}>
+            <AppText>{auditLabel(a.action)}</AppText>
+            <AppText variant="small" tone="muted">
+              {formatTime(a.at)}
+            </AppText>
+          </View>
+        </View>
+      ))}
+    </Card>
+  );
+}
 
 const styles = StyleSheet.create({
-  rowItem: { flexDirection: 'row', alignItems: 'center', gap: 14, flexWrap: 'wrap' },
-  rowDivider: { borderTopWidth: 1, borderTopColor: palette.border, paddingTop: 16 },
+  strip: { flexDirection: 'row', gap: 12, alignItems: 'stretch', flexWrap: 'wrap' },
+  stat: {
+    flexGrow: 1,
+    flexBasis: 110,
+    gap: 2,
+    paddingVertical: 10,
+    paddingHorizontal: 14,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: palette.border,
+    backgroundColor: palette.card,
+    justifyContent: 'center',
+  },
+  statWide: { flexBasis: 200, flexGrow: 2 },
+  rowItem: { flexDirection: 'row', alignItems: 'center', gap: 12, flexWrap: 'wrap' },
+  rowDivider: { borderTopWidth: 1, borderTopColor: palette.border, paddingTop: 10 },
 });
 
 function WeekCard({ week, pct }: { week: DayBar[]; pct: number | null }) {
@@ -482,16 +561,19 @@ function ReviewCard({
             />
           ))}
         </View>
-      ) : (
-        <BigButton tone="ghost" label="View photos" busy={busy} onPress={onView} />
-      )}
-      <BigButton label="Looks fine" disabled={busy} onPress={() => onDecide('approve')} />
-      <BigButton
-        tone="danger"
-        label="Not right"
-        disabled={busy}
-        onPress={() => onDecide('reject')}
-      />
+      ) : null}
+      <Row gap={8}>
+        {photos ? null : (
+          <BigButton tone="ghost" label="View photos" busy={busy} onPress={onView} />
+        )}
+        <BigButton label="Looks fine" disabled={busy} onPress={() => onDecide('approve')} />
+        <BigButton
+          tone="danger"
+          label="Not right"
+          disabled={busy}
+          onPress={() => onDecide('reject')}
+        />
+      </Row>
       <AppText variant="small" tone="muted">
         Photos are deleted when you approve, or after 7 days. Every time you view them is recorded.
       </AppText>

@@ -4,7 +4,8 @@ Read the root `CLAUDE.md` first. Stay inside `features/reminders/`.
 
 ## Purpose
 
-Daily reminders for the patient: **pill, brush teeth, shower, feed pets**. The primary caregiver sets the
+Daily reminders for the patient: **pill, brush teeth, shower, feed pets**, plus **custom** (the caregiver's own short words,
+e.g. "Water the plants"). The primary caregiver sets the
 schedules; the patient confirms with ONE tap. Unconfirmed => the caregiver is alerted (`caregiver.alert`).
 Circle members have no access at all. Pills also get an optional **photo check** (below).
 
@@ -25,7 +26,12 @@ Circle members have no access at all. Pills also get an optional **photo check**
   only the caregiver can ("I gave it"). No catch-up doses are ever scheduled.
 - One occurrence per schedule per LOCAL day (`scheduleId:YYYY-MM-DD`): DST can't create two. Spring-forward gap => shifted
   forward; fall-back overlap => first occurrence. A schedule created after today's time doesn't alert for today.
-- Paused schedules (asleep / in hospital) neither prompt nor alert. No free-text labels (medication names are health data).
+- Paused schedules (asleep / in hospital) neither prompt nor alert.
+- **Free text only on `custom` reminders** (owner's request; the built-in kinds still refuse a label). `label` is 2-40 chars, trimmed,
+  no links/markup/emails, digit runs of 6+ masked to `[number]` (zod in `schemas.ts`; DB checks in `reminders__202610250247_custom.sql`).
+  It is copied onto each day's occurrence and shown ONLY on the patient's and caregiver's screens: the push says "Time for your reminder"
+  and the `caregiver.alert` carries no label (tested in `tests/unit/custom.test.ts`). It may be health data (a caregiver can still type a
+  medicine name), so never log it. Custom reminders escalate as `warning`, like the other non-pill kinds; no double-dose logic applies.
 - Events carry IDs/enums only (`reasonCode: 'reminder_missed'`).
 
 ## Data owned
@@ -50,8 +56,11 @@ Try it: `npm run dev:api:demo`, then call with `Authorization: Bearer demo:careg
 
 - **Patient** (`PatientReminders`): ONE card, ONE primary button ("I took it"); snooze is secondary (hidden at the limit);
   a missed pill says "Your caregiver has been told" with no retry; errors are plain words (`ui/model.ts`).
-- **Caregiver** (`CaregiverReminders`): counts, "needs attention" cards with "I gave it" / "Mark done", today's list,
-  7-day history, schedule list (pause/resume, two-tap delete), add form. Circle members see nothing from this feature.
+- **Caregiver** (`CaregiverReminders.tsx`, six dashboard widgets, one per section): alerts (one "missed" card with "I gave it" / "Mark done" rows, pill-photo reviews;
+  reports to the dashboard status line via `useAttention` / `attentionReport` in `ui/model.ts`: a missed pill or "photos look wrong" is urgent), summary (stats strip:
+  date, done, coming up, missed, week %, next; the overall "all clear" is the shell's status line, not this strip), today (today's list), manage (schedule list with
+  pause/resume + two-tap delete; the add form is folded behind "Add a reminder", with a "Custom" choice that asks "What should we remind
+  them?"), week (7-day graph), activity (audit log, folded by default). Circle members see nothing from this feature.
 - `ui/model.ts` holds the logic (unit-tested); the `.tsx` files are thin.
 
 ## Pill photo check

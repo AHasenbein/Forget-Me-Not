@@ -72,6 +72,9 @@ tests/             architecture/ (boundary, route-auth), smoke/, e2e/, integrati
    (`defineFeatureUi({ widgets: [{ id, role, order, Component }] })`), auto-registered by `gen-registry` (gitignored
    `ui-registry.generated.ts`). Never import `ui/` from `manifest.ts` (the server must not load React Native). Keep view
    logic in pure `.ts` (unit-testable) and the `.tsx` thin. Build with `core/design-system/components` only.
+   The caregiver/family UI is `standard` density (ordinary app sizes, set by the shell; Text size is patient-only); patient UI
+   rules apply to patient widgets. Caregiver alert widgets report to the dashboard status line with `useAttention`
+   (`core/client/attention.ts`): `null` while loading, `unknown` when a poll failed, never silence as "all clear".
 8. **Time and background work**: read time ONLY from `@core/clock` `now()` (services take `now` as a dependency so tests use
    `FakeClock`). Background work = manifest `jobs` (run by `core/jobs`); never `setInterval` inside a feature or a handler.
 9. Feature flags: `FEATURE_<NAME>=on|off`. New features ship `enabledByDefault: false`; off = no routes, no subscriptions (inert).

@@ -52,7 +52,8 @@ Patient (order 25, in the shared "Before I pay" group): outlined "Scan bill" (th
 camera, `expo-camera`) / Choose a picture (web file chooser, resized to <= 1600 px JPEG) / demo samples -> "Reading your bill..." -> result
 card with the table. Repeated taps are dropped. Native phones cannot pick from the gallery yet (needs `expo-image-picker` = new EAS build).
 Caregiver (order 6, renders nothing until a bill was shown): one line per scan, "Looks like a scam" / "Needs a look" badges, each warning
-sign in words, and where the reading came from ("Read by AI" / "Demo sample"). Logic is in `ui/model.ts` (pure, tested).
+sign in words, and where the reading came from ("Read by AI" / "Demo sample"). Flagged bills count on the dashboard status line (`useAttention`,
+warning) until the caregiver taps "Seen it" (remembered on that device only, in AsyncStorage; a server-side "mark as handled" is still to do). Logic is in `ui/model.ts` (pure, tested).
 
 ## Edge cases covered
 

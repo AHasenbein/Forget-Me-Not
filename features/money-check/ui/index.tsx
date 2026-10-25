@@ -13,6 +13,12 @@ export default defineFeatureUi({
       Component: PatientCheck,
     },
     // Near the top of the caregiver dashboard, and renders nothing until the patient asks.
-    { id: 'money-check', role: 'primary_caregiver', order: 2, Component: CaregiverCheck },
+    {
+      id: 'money-check',
+      role: 'primary_caregiver',
+      section: 'alerts',
+      order: 2,
+      Component: CaregiverCheck,
+    },
   ],
 });

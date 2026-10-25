@@ -1,4 +1,4 @@
-import { useRef, useState, type ReactNode } from 'react';
+import { useContext, useRef, useState, type ReactNode } from 'react';
 import { Image, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import icon_pill from './icons/pill.png';
 import icon_toothbrush from './icons/toothbrush.png';
@@ -13,11 +13,14 @@ import icon_camera from './icons/camera.png';
 import icon_flower from './icons/flower.png';
 import { font, palette, patientUi, radius, type IconName, type Tone } from './tokens';
 
-/** Multiplier from Settings > Text size. Provided by the shell. */
-import { useTextScale } from './text-scale';
+/** Multiplier from Settings > Text size, the density (patient vs caregiver) and column fill. Provided by the shell. */
+import { FillContext, useDensity, useTextScale } from './text-scale';
 
 type Variant = 'huge' | 'title' | 'body' | 'small';
 const SIZE: Record<Variant, number> = { huge: 40, title: 30, body: 24, small: 18 };
+/** Caregiver (standard density): an ordinary app type scale. Text size never applies here. */
+const STANDARD_SIZE: Record<Variant, number> = { huge: 28, title: 18, body: 15, small: 13 };
+const useStandard = () => useDensity() === 'standard';
 
 export function AppText({
   variant = 'body',
@@ -33,6 +36,7 @@ export function AppText({
   children: ReactNode;
 }) {
   const scale = useTextScale();
+  const standard = useStandard();
   const color =
     tone === 'inverse'
       ? '#FFFFFF'
@@ -45,12 +49,16 @@ export function AppText({
             : palette.text;
   const display = variant === 'huge' || variant === 'title';
   // Headlines stop growing at 1.25x: at 1.5x a 40px title swallows a phone screen.
-  const size = SIZE[variant] * (display ? Math.min(scale, 1.25) : scale);
+  const size = standard
+    ? STANDARD_SIZE[variant]
+    : SIZE[variant] * (display ? Math.min(scale, 1.25) : scale);
   return (
     <Text
       style={{
         fontSize: size,
-        lineHeight: Math.round(size * (display ? 1.15 : 1.35)),
+        lineHeight: Math.round(
+          size * (display ? (standard ? 1.25 : 1.15) : standard ? 1.45 : 1.35),
+        ),
         color,
         ...(display ? font.display : bold ? font.bold : font.body),
         textAlign: center ? 'center' : 'left',
@@ -75,7 +83,8 @@ export function Screen({ children, wide }: { children: ReactNode; wide?: boolean
 
 /** One per screen: flat deep green, serif headline, white text. No decoration. */
 export function Hero({ children }: { children: ReactNode }) {
-  return <View style={s.hero}>{children}</View>;
+  const tight = Math.min(useTextScale(), 1);
+  return <View style={[s.hero, { padding: 28 * tight, gap: 20 * tight }]}>{children}</View>;
 }
 
 const BG: Record<Tone, string> = {
@@ -95,18 +104,23 @@ const RULE: Record<Tone, string> = {
 
 /** Flat surface with a hairline. Meaning is carried by a coloured left rule, not by a tinted outline. */
 export function Card({ tone = 'neutral', children }: { tone?: Tone; children: ReactNode }) {
+  const standard = useStandard();
+  const fill = useContext(FillContext);
   return (
     <View
       style={[
         s.card,
+        fill && { flexGrow: 1 },
         {
+          padding: standard ? 16 : 24,
+          gap: standard ? 10 : 16,
           backgroundColor: BG[tone],
           borderLeftColor: RULE[tone],
           borderLeftWidth: tone === 'neutral' ? 1 : 6,
         },
       ]}
     >
-      {children}
+      <FillContext.Provider value={false}>{children}</FillContext.Provider>
     </View>
   );
 }
@@ -114,10 +128,11 @@ export function Card({ tone = 'neutral', children }: { tone?: Tone; children: Re
 /** Status tag: a dot and a word, no pill container. */
 export function Badge({ label, tone = 'neutral' }: { label: string; tone?: Tone }) {
   const color = tone === 'neutral' ? palette.muted : palette[tone];
+  const standard = useStandard();
   return (
     <View style={s.badge}>
       <View style={[s.dot, { backgroundColor: color }]} />
-      <Text style={{ color, ...font.bold, fontSize: 16 }}>{label}</Text>
+      <Text style={{ color, ...font.bold, fontSize: standard ? 13 : 16 }}>{label}</Text>
     </View>
   );
 }
@@ -125,6 +140,7 @@ export function Badge({ label, tone = 'neutral' }: { label: string; tone?: Tone 
 /**
  * Touch target >= 64px (`huge` = 128px). While `busy`/`disabled` it ignores presses, and it also drops
  * repeated taps within 700ms: confused or tremoring users tap again and again.
+ * In `standard` density (caregiver) it is an ordinary 44px button sized to its label.
  */
 export function BigButton({
   label,
@@ -142,6 +158,7 @@ export function BigButton({
   disabled?: boolean;
 }) {
   const scale = useTextScale();
+  const standard = useStandard();
   const last = useRef(0);
   const off = busy || disabled;
   const solid = tone === 'primary' || tone === 'success' || tone === 'danger';
@@ -159,8 +176,13 @@ export function BigButton({
       }}
       style={({ pressed }) => [
         s.button,
+        standard && s.buttonStandard,
         {
-          minHeight: size === 'huge' ? 128 : Math.max(patientUi.minTouchTarget, 72),
+          minHeight: standard
+            ? 44 // ordinary app size, still a comfortable phone target
+            : size === 'huge'
+              ? 128
+              : Math.max(patientUi.minTouchTarget, 72),
           backgroundColor: solid ? base : 'transparent',
           borderColor: solid ? base : palette.borderStrong,
           opacity: off ? 0.5 : pressed ? 0.85 : 1,
@@ -169,7 +191,7 @@ export function BigButton({
     >
       <Text
         style={{
-          fontSize: (size === 'huge' ? 38 : patientUi.minFontSize) * scale,
+          fontSize: standard ? 15 : (size === 'huge' ? 38 : patientUi.minFontSize) * scale,
           ...font.bold,
           color: solid ? palette.onPrimary : base,
           textAlign: 'center',
@@ -190,6 +212,7 @@ export function Chip({
   selected?: boolean;
   onPress: () => void;
 }) {
+  const standard = useStandard();
   return (
     <Pressable
       accessibilityRole="button"
@@ -197,6 +220,7 @@ export function Chip({
       onPress={onPress}
       style={({ pressed }) => [
         s.chip,
+        standard && s.chipStandard,
         {
           backgroundColor: selected ? palette.primary : palette.card,
           borderColor: palette.primary,
@@ -208,7 +232,7 @@ export function Chip({
         style={{
           color: selected ? palette.onPrimary : palette.primary,
           ...font.bold,
-          fontSize: 18,
+          fontSize: standard ? 14 : 18,
         }}
       >
         {label}
@@ -229,6 +253,7 @@ export function Field({
   placeholder?: string;
 }) {
   const [focus, setFocus] = useState(false);
+  const standard = useStandard();
   return (
     <View style={{ gap: 4 }}>
       <AppText variant="small" tone="muted">
@@ -242,7 +267,11 @@ export function Field({
         placeholderTextColor={palette.muted}
         onFocus={() => setFocus(true)}
         onBlur={() => setFocus(false)}
-        style={[s.input, { borderColor: focus ? palette.primary : palette.inputBorder }]}
+        style={[
+          s.input,
+          standard && s.inputStandard,
+          { borderColor: focus ? palette.primary : palette.inputBorder },
+        ]}
       />
     </View>
   );
@@ -262,7 +291,10 @@ const ICONS: Record<IconName, number> = {
   flower: icon_flower,
 };
 
-/** Line icon image (tinted) or the full-colour brand flower. Decorative: always sits next to a text label. */
+/**
+ * Line icon image (tinted) or the full-colour brand flower. Decorative: always sits next to a text label.
+ * Sizes are given for the patient UI; standard density (caregiver) draws them at about 60% to match its smaller text.
+ */
 export function Icon({
   name,
   size = 24,
@@ -272,12 +304,13 @@ export function Icon({
   size?: number;
   color?: string;
 }) {
+  const px = useStandard() ? Math.max(16, Math.round(size * 0.6)) : size;
   return (
     <Image
       accessibilityElementsHidden
       importantForAccessibility="no-hide-descendants"
       source={ICONS[name]}
-      style={[{ width: size, height: size }, name !== 'flower' && { tintColor: color }]}
+      style={[{ width: px, height: px }, name !== 'flower' && { tintColor: color }]}
     />
   );
 }
@@ -306,6 +339,7 @@ export function Segmented<T extends string>({
   value: T;
   onChange: (id: T) => void;
 }) {
+  const standard = useStandard();
   return (
     <View style={s.tabs} accessibilityRole="tablist">
       {options.map((o) => {
@@ -316,11 +350,15 @@ export function Segmented<T extends string>({
             accessibilityRole="tab"
             accessibilityState={{ selected: on }}
             onPress={() => onChange(o.id)}
-            style={[s.tab, { borderBottomColor: on ? palette.primary : 'transparent' }]}
+            style={[
+              s.tab,
+              standard && { minHeight: 44, paddingHorizontal: 10 },
+              { borderBottomColor: on ? palette.primary : 'transparent' },
+            ]}
           >
             <Text
               style={{
-                fontSize: 18,
+                fontSize: standard ? 14 : 18,
                 ...font.bold,
                 color: on ? palette.primary : palette.muted,
               }}
@@ -461,6 +499,13 @@ const s = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
+  buttonStandard: {
+    borderWidth: 1.5,
+    borderRadius: radius.sm,
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+    alignSelf: 'flex-start',
+  },
   chip: {
     borderWidth: 1.5,
     borderRadius: radius.sm,
@@ -469,6 +514,8 @@ const s = StyleSheet.create({
     minHeight: 52,
     justifyContent: 'center',
   },
+  chipStandard: { paddingHorizontal: 12, paddingVertical: 6, minHeight: 36 },
+  inputStandard: { borderWidth: 1.5, minHeight: 44, fontSize: 15, paddingHorizontal: 10 },
   input: {
     borderWidth: 2,
     borderRadius: radius.sm,

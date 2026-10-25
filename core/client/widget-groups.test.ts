@@ -1,12 +1,25 @@
 import { describe, expect, it } from 'vitest';
 import type { Widget } from '../feature-registry/ui';
-import { dashboardItems } from './widget-groups';
+import {
+  bySection,
+  DASHBOARD_LAYOUT,
+  dashboardItems,
+  dashboardStatus,
+  rowsFor,
+  SECTIONS,
+} from './widget-groups';
 
-const w = (id: string, order: number, group?: Widget['group']): Widget => ({
+const w = (
+  id: string,
+  order: number,
+  group?: Widget['group'],
+  section?: Widget['section'],
+): Widget => ({
   id,
   role: 'patient',
   order,
   group,
+  section,
   Component: () => null,
 });
 
@@ -26,5 +39,95 @@ describe('dashboardItems', () => {
     expect(items.map((i) => i.kind)).toEqual(['widget', 'group', 'widget']);
     const group = items[1];
     expect(group?.kind === 'group' && group.members.map((m) => m.id)).toEqual(['check', 'bill']);
+  });
+});
+
+describe('bySection', () => {
+  it('orders sections top to bottom, sorts by order inside, defaults to today', () => {
+    const out = bySection([
+      w('graph', 5, undefined, 'week'),
+      w('lost', 2, undefined, 'alerts'),
+      w('hero', 9),
+      w('hero-first', 1, undefined, 'today'),
+    ]);
+    expect(out.map((s) => s.id)).toEqual(['alerts', 'today', 'week']);
+    expect(out[1]?.widgets.map((x) => x.id)).toEqual(['hero-first', 'hero']);
+  });
+
+  it('leaves out sections with no widgets', () => {
+    expect(bySection([w('a', 1, undefined, 'activity')]).map((s) => s.id)).toEqual(['activity']);
+  });
+
+  it('puts what needs you first, so phones show alerts before anything else', () => {
+    expect(SECTIONS[0]?.id).toBe('alerts');
+  });
+});
+
+describe('DASHBOARD_LAYOUT', () => {
+  it('places every section exactly once', () => {
+    const placed = [...DASHBOARD_LAYOUT.top, ...rowsFor(3).flat()];
+    expect([...placed].sort()).toEqual(SECTIONS.map((s) => s.id).sort());
+  });
+
+  it('puts the activity log under Today and the "needs you" box under Reminders', () => {
+    expect(rowsFor(3)).toEqual([
+      ['today', 'manage', 'where'],
+      ['activity', 'alerts', 'week'],
+    ]);
+  });
+
+  it('re-cuts the same boxes into narrower rows, keeping order and every section', () => {
+    expect(rowsFor(2)).toEqual([
+      ['today', 'manage'],
+      ['where', 'activity'],
+      ['alerts', 'week'],
+    ]);
+    expect(rowsFor(1)).toHaveLength(6);
+  });
+});
+
+describe('dashboardStatus', () => {
+  it('is all clear only when every widget reported nothing open', () => {
+    expect(dashboardStatus([{ count: 0 }, { count: 0 }])).toMatchObject({
+      tone: 'success',
+      title: 'All clear',
+    });
+  });
+
+  it('says checking while a widget has not loaded yet, never all clear', () => {
+    expect(dashboardStatus([{ count: 0 }, 'checking']).title).toBe('Checking…');
+    expect(dashboardStatus([]).title).toBe('Checking…');
+  });
+
+  it('counts open items and lists urgent ones first', () => {
+    const s = dashboardStatus([
+      { count: 2, severity: 'warning', what: '2 missed reminders' },
+      { count: 1, severity: 'urgent', what: 'They pressed “I’m lost”' },
+    ]);
+    expect(s).toMatchObject({ tone: 'danger', title: '3 things need you now' });
+    expect(s.detail).toBe('They pressed “I’m lost” · 2 missed reminders');
+  });
+
+  it('is a warning, not urgent, when nothing open is urgent', () => {
+    expect(dashboardStatus([{ count: 1, severity: 'warning' }])).toMatchObject({
+      tone: 'warn',
+      title: '1 thing needs you',
+    });
+  });
+
+  it('never reads a failed widget as all clear', () => {
+    const s = dashboardStatus([{ count: 0 }, { count: 0, unknown: 'phone calls' }]);
+    expect(s.tone).toBe('warn');
+    expect(s.title).not.toMatch(/clear/i);
+    expect(s.detail).toContain('phone calls');
+  });
+
+  it('keeps open items first and still says what could not be checked', () => {
+    const s = dashboardStatus([
+      { count: 1, severity: 'urgent', what: 'A payment to check' },
+      { count: 0, unknown: 'bills' },
+    ]);
+    expect(s.tone).toBe('danger');
+    expect(s.detail).toContain('Can’t check right now: bills.');
   });
 });

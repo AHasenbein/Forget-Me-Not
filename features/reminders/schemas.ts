@@ -2,10 +2,24 @@ import { z } from 'zod';
 import { FRAME_TYPES, type FrameType } from '@core/ai/vision';
 import { isValidTimeZone } from './time';
 
-export const REMINDER_KINDS = ['pill', 'brush_teeth', 'shower', 'feed_pets'] as const;
+export const REMINDER_KINDS = ['pill', 'brush_teeth', 'shower', 'feed_pets', 'custom'] as const;
 export type ReminderKind = (typeof REMINDER_KINDS)[number];
 
 const kind = z.enum(REMINDER_KINDS);
+
+export const LABEL_MAX = 40;
+/**
+ * The caregiver's own words for a `custom` reminder ("Water the plants"). The ONE free-text field here: shown on the
+ * patient's and caregiver's screens only, never in a push, an event, the audit log or a log line. Plain words only:
+ * no links, no markup, digit runs of 6+ masked (phone / account numbers do not belong in a reminder).
+ */
+const label = z
+  .string()
+  .trim()
+  .min(2)
+  .max(LABEL_MAX)
+  .refine((t) => !/[<>{}]|https?:|www\.|@/i.test(t), 'plain words only')
+  .transform((t) => t.replace(/\s+/g, ' ').replace(/\d{6,}/g, '[number]'));
 const localTime = z.string().regex(/^([01]\d|2[0-3]):[0-5]\d$/, 'HH:MM');
 const days = z
   .array(z.number().int().min(0).max(6))
@@ -14,16 +28,21 @@ const days = z
   .transform((d) => [...new Set(d)].sort());
 const timeZone = z.string().refine(isValidTimeZone, 'unknown time zone');
 
-/** Only fields the caller may set. No free-text labels: medication names are health data. */
+/** Only fields the caller may set. `label` is required for `custom` reminders and refused for every other kind. */
 export const createScheduleInput = z
   .object({
     kind,
+    label: label.optional(),
     localTime,
     daysOfWeek: days.default([0, 1, 2, 3, 4, 5, 6]),
     timeZone,
     escalate: z.boolean().default(true),
   })
-  .strict();
+  .strict()
+  .refine((v) => (v.kind === 'custom') === (v.label !== undefined), {
+    message: 'a custom reminder needs a label; other kinds take none',
+    path: ['label'],
+  });
 
 export const patchScheduleInput = z
   .object({
@@ -68,6 +87,8 @@ export interface Schedule {
   id: string;
   patientId: string;
   kind: ReminderKind;
+  /** Only for `custom`: the caregiver's words. Never pushed, emitted or logged. */
+  label?: string;
   localTime: string;
   daysOfWeek: number[];
   timeZone: string;
@@ -119,6 +140,8 @@ export interface Occurrence {
   scheduleId: string;
   patientId: string;
   kind: ReminderKind;
+  /** Copied from the schedule (`custom` only). */
+  label?: string;
   localDate: string;
   timeZone: string;
   dueAt: string;

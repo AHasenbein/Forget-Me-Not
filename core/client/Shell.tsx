@@ -1,6 +1,6 @@
 import { Link, usePathname, useRouter } from 'expo-router';
 import { useCallback, useEffect, useState, type ReactNode } from 'react';
-import { Pressable, Text, useWindowDimensions, View } from 'react-native';
+import { Platform, Pressable, ScrollView, Text, useWindowDimensions, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import {
   AppText,
@@ -19,9 +19,20 @@ import { usePoll } from './hooks';
 import { formatTime } from './format';
 import { SignIn } from './SignIn';
 import { PERSONAS, TEXT_SIZES, useSession } from './session';
-import { dashboardItems, WIDGET_GROUPS } from './widget-groups';
+import {
+  bySection,
+  DASHBOARD_LAYOUT,
+  dashboardItems,
+  dashboardStatus,
+  rowsFor,
+  WIDGET_GROUPS,
+  type AttentionReport,
+  type DashboardStatus,
+} from './widget-groups';
+import { AttentionContext } from './attention';
+import { DensityContext, FillContext } from '../design-system/text-scale';
 import { widgetsFor } from './widgets';
-import type { Widget, WidgetGroup } from '../feature-registry/ui';
+import type { DashboardSection, Widget, WidgetGroup } from '../feature-registry/ui';
 
 export function TopBar({ hideBrand }: { hideBrand?: boolean } = {}) {
   const { demo, persona, setPersona, role } = useSession();
@@ -34,13 +45,14 @@ export function TopBar({ hideBrand }: { hideBrand?: boolean } = {}) {
       style={{
         backgroundColor: palette.bg,
         paddingTop: insets.top + 8,
-        paddingHorizontal: 20,
+        paddingHorizontal: patient ? 20 : 12,
         paddingBottom: 8,
         gap: 8,
         alignItems: 'center',
       }}
     >
-      <View style={{ width: '100%', maxWidth: hideBrand ? 1120 : 720, gap: 8 }}>
+      {/* Caregivers: as wide as their dashboard, so the bar lines up with it. */}
+      <View style={{ width: '100%', maxWidth: hideBrand ? 1120 : patient ? 720 : 1440, gap: 8 }}>
         <Row gap={8}>
           <View style={{ flex: 1, flexDirection: 'row', alignItems: 'center', gap: 10 }}>
             <Icon name="flower" size={36} />
@@ -52,15 +64,15 @@ export function TopBar({ hideBrand }: { hideBrand?: boolean } = {}) {
           </View>
           {/* Demo badge never shows on patient screens (root rule). */}
           {demo && !patient ? <Badge label="Demo data" tone="warn" /> : null}
-          {/* Patient: one calm corner control. Caregiver uses the bottom bar instead. */}
-          {patient ? (
+          {/* One corner control on its own page for both roles (the caregiver dashboard has no room for settings). */}
+          {role === 'patient' || role === 'primary_caregiver' ? (
             <Link href={onSettings ? '/' : '/settings'} asChild>
               <Pressable
                 accessibilityRole="button"
                 accessibilityLabel={onSettings ? 'Back to home' : 'Settings'}
                 style={{
-                  minHeight: 64,
-                  minWidth: 64,
+                  minHeight: patient ? 64 : 40,
+                  minWidth: patient ? 64 : 40,
                   alignItems: 'center',
                   justifyContent: 'center',
                   borderRadius: 8,
@@ -71,8 +83,8 @@ export function TopBar({ hideBrand }: { hideBrand?: boolean } = {}) {
                 }}
               >
                 <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-                  <Icon name={onSettings ? 'back' : 'sliders'} size={26} />
-                  <Text style={{ fontSize: 24, ...font.bold, color: palette.text }}>
+                  <Icon name={onSettings ? 'back' : 'sliders'} size={patient ? 26 : 20} />
+                  <Text style={{ fontSize: patient ? 24 : 16, ...font.bold, color: palette.text }}>
                     {onSettings ? 'Back' : 'Settings'}
                   </Text>
                 </View>
@@ -92,125 +104,20 @@ export function TopBar({ hideBrand }: { hideBrand?: boolean } = {}) {
   );
 }
 
-const NAV = [
-  { href: '/', label: 'Home', icon: 'home' },
-  { href: '/settings', label: 'Settings', icon: 'sliders' },
-] as const;
-
-/** Caregiver bottom bar: two big labelled destinations, always visible, never hidden off-screen. */
-export function BottomNav() {
-  const { role, liveStatus } = useSession();
-  const path = usePathname();
-  const insets = useSafeAreaInsets();
-  const wide = useWindowDimensions().width >= 900;
-  if (role !== 'primary_caregiver' || liveStatus !== 'ready' || wide) return null;
-  return (
-    <View
-      accessibilityRole="tablist"
-      style={{
-        flexDirection: 'row',
-        backgroundColor: palette.card,
-        borderTopWidth: 1,
-        borderColor: palette.border,
-        paddingBottom: insets.bottom + 4,
-        paddingTop: 4,
-      }}
-    >
-      {NAV.map((n) => {
-        const on = n.href === '/' ? path === '/' : path.startsWith(n.href);
-        return (
-          <Link key={n.href} href={n.href} asChild>
-            <Pressable
-              accessibilityRole="tab"
-              accessibilityState={{ selected: on }}
-              style={{ flex: 1, minHeight: 64, alignItems: 'center', justifyContent: 'center' }}
-            >
-              <View
-                style={{
-                  paddingHorizontal: 24,
-                  paddingVertical: 6,
-                  borderTopWidth: 3,
-                  borderTopColor: on ? palette.primary : 'transparent',
-                  alignItems: 'center',
-                }}
-              >
-                <Icon name={n.icon} size={26} color={on ? palette.primary : palette.muted} />
-                <Text
-                  style={{
-                    fontSize: 16,
-                    ...font.bold,
-                    color: on ? palette.primary : palette.muted,
-                  }}
-                >
-                  {n.label}
-                </Text>
-              </View>
-            </Pressable>
-          </Link>
-        );
-      })}
-    </View>
-  );
-}
-
-/** Desktop/tablet: caregiver navigation moves to a left sidebar and the content gets the full width. */
-function Sidebar() {
-  const path = usePathname();
-  return (
-    <View
-      style={{
-        width: 240,
-        backgroundColor: palette.hero,
-        padding: 20,
-        paddingTop: 28,
-        gap: 8,
-      }}
-    >
-      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10, marginBottom: 24 }}>
-        <Icon name="flower" size={40} />
-        <Text style={{ fontSize: 20, ...font.bold, color: '#FFFFFF', flex: 1 }}>Forget Me Not</Text>
-      </View>
-      {NAV.map((n) => {
-        const on = n.href === '/' ? path === '/' : path.startsWith(n.href);
-        return (
-          <Link key={n.href} href={n.href} asChild>
-            <Pressable
-              accessibilityRole="link"
-              accessibilityState={{ selected: on }}
-              style={{
-                minHeight: 56,
-                flexDirection: 'row',
-                alignItems: 'center',
-                gap: 14,
-                paddingHorizontal: 16,
-                borderRadius: 6,
-                backgroundColor: on ? 'rgba(255,255,255,0.16)' : 'transparent',
-              }}
-            >
-              <Icon name={n.icon} size={26} color="#FFFFFF" />
-              <Text style={{ fontSize: 20, ...font.bold, color: '#FFFFFF' }}>{n.label}</Text>
-            </Pressable>
-          </Link>
-        );
-      })}
-    </View>
-  );
-}
-
-/** Root frame: optional sidebar on wide screens, then top bar, page and (narrow) bottom bar. */
+/**
+ * Root frame: top bar, then the page. Only the patient (and anyone not signed in yet) gets the large patient UI;
+ * caregivers and family get an ordinary app UI.
+ */
 export function AppFrame({ children }: { children: ReactNode }) {
-  const { role, liveStatus } = useSession();
-  const wide = useWindowDimensions().width >= 900;
-  const side = wide && role === 'primary_caregiver' && liveStatus === 'ready';
+  const { role } = useSession();
+  const density = role === 'primary_caregiver' || role === 'circle_member' ? 'standard' : 'patient';
   return (
-    <View style={{ flex: 1, flexDirection: 'row', backgroundColor: palette.bg }}>
-      {side ? <Sidebar /> : null}
-      <View style={{ flex: 1 }}>
-        <TopBar hideBrand={side} />
+    <DensityContext.Provider value={density}>
+      <View style={{ flex: 1, backgroundColor: palette.bg }}>
+        <TopBar />
         {children}
-        <BottomNav />
       </View>
-    </View>
+    </DensityContext.Provider>
   );
 }
 
@@ -308,10 +215,173 @@ export function Home() {
       </Screen>
     );
   // The date and greeting come from the widgets (they use the server's `now`, not the device clock).
+  if (role === 'primary_caregiver') return <CaregiverPage />;
   return (
-    <Screen wide={role === 'primary_caregiver'}>
+    <Screen>
       <Widgets />
     </Screen>
+  );
+}
+
+const TILE_GAP = 12;
+const MAX_WIDTH = 1440;
+
+/** Gives one widget its own reporter for the status line, and withdraws its report when it unmounts. */
+function AttentionSlot({
+  id,
+  onReport,
+  children,
+}: {
+  id: string;
+  onReport: (id: string, r: AttentionReport | null) => void;
+  children: ReactNode;
+}) {
+  const report = useCallback((r: AttentionReport) => onReport(id, r), [id, onReport]);
+  useEffect(() => () => onReport(id, null), [id, onReport]);
+  return <AttentionContext.Provider value={report}>{children}</AttentionContext.Provider>;
+}
+
+const STATUS_BG = {
+  danger: palette.dangerBg,
+  warn: palette.warnBg,
+  success: palette.successBg,
+  neutral: palette.card,
+} as const;
+const STATUS_RULE = {
+  danger: palette.danger,
+  warn: palette.warn,
+  success: palette.success,
+  neutral: palette.border,
+} as const;
+
+/** The one answer to "is everything OK?": a tinted banner, headline on top and what it is about underneath. */
+function StatusLine({ status }: { status: DashboardStatus }) {
+  const tone = status.tone === 'neutral' ? undefined : status.tone;
+  return (
+    <View
+      accessibilityLiveRegion="polite"
+      style={{
+        gap: 4,
+        paddingVertical: 10,
+        paddingHorizontal: 14,
+        borderRadius: 6,
+        borderLeftWidth: 6,
+        borderLeftColor: STATUS_RULE[status.tone],
+        backgroundColor: STATUS_BG[status.tone],
+      }}
+    >
+      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
+        {tone ? (
+          <Icon name={tone === 'success' ? 'check' : 'alert'} size={28} color={palette[tone]} />
+        ) : null}
+        <View style={{ flex: 1 }}>
+          <AppText variant="title" tone={tone}>
+            {status.title}
+          </AppText>
+        </View>
+      </View>
+      {status.detail ? <AppText>{status.detail}</AppText> : null}
+    </View>
+  );
+}
+
+/** "Needs you" box: the status banner, then each open alert card (lost, payment, call, bill, missed reminder). */
+function NeedsYou({ status, children }: { status: DashboardStatus; children: ReactNode }) {
+  return (
+    <Card>
+      <StatusLine status={status} />
+      {children}
+    </Card>
+  );
+}
+
+/**
+ * Caregiver dashboard: the stats strip, then two rows of three boxes, each row's boxes the same height: Today, Reminders,
+ * Location; then Activity log, the "needs you" box, This week (rows of two on narrower windows). The box's status banner says whether anything
+ * needs you (widgets report through `useAttention`; it never says "all clear" while something is loading or failed),
+ * with the open alert cards under it. It is an ordinary app UI (`standard` density: normal type and controls; Text size is for the
+ * patient only). The page scrolls a little on small windows instead of shrinking.
+ * Phones stack the same sections in `SECTIONS` order. Widgets come from features via `section`; this file never names a feature.
+ */
+function CaregiverPage() {
+  const { token } = useSession();
+  const { width } = useWindowDimensions();
+  const wide = width >= 900 && Platform.OS === 'web'; // phones and tablets get the one-column stack
+  const sections = bySection(widgetsFor('primary_caregiver'));
+  const [reports, setReports] = useState<Record<string, AttentionReport>>({});
+  const onReport = useCallback((id: string, r: AttentionReport | null) => {
+    setReports((prev) => {
+      if (r === null) {
+        if (!(id in prev)) return prev;
+        const { [id]: _gone, ...rest } = prev;
+        return rest;
+      }
+      return JSON.stringify(prev[id]) === JSON.stringify(r) ? prev : { ...prev, [id]: r };
+    });
+  }, []);
+  const status = dashboardStatus(Object.values(reports));
+
+  const widgetsIn = (ids: readonly DashboardSection[]) =>
+    ids.flatMap((id) => sections.find((s) => s.id === id)?.widgets ?? []);
+  const slot = (w: Widget) => (
+    <AttentionSlot key={`${token}:${w.id}`} id={`${token}:${w.id}`} onReport={onReport}>
+      <w.Component />
+    </AttentionSlot>
+  );
+  const frame = (body: ReactNode) => (
+    <DensityContext.Provider value="standard">
+      <ScrollView
+        style={{ flex: 1 }}
+        contentContainerStyle={{
+          width: '100%',
+          maxWidth: MAX_WIDTH,
+          alignSelf: 'center',
+          paddingHorizontal: TILE_GAP,
+          paddingBottom: 40,
+          gap: TILE_GAP,
+        }}
+        keyboardShouldPersistTaps="handled"
+      >
+        {body}
+      </ScrollView>
+    </DensityContext.Provider>
+  );
+  // One section's tiles; `alerts` becomes the "needs you" box (always shown, so the status is never missing).
+  const section = (id: DashboardSection) =>
+    id === 'alerts' ? (
+      <NeedsYou key="needs-you" status={status}>
+        {widgetsIn(['alerts']).map(slot)}
+      </NeedsYou>
+    ) : (
+      widgetsIn([id]).map(slot)
+    );
+
+  // Phones: one column in `SECTIONS` order, the "needs you" box first. No wrappers: a widget that renders nothing
+  // (no open alert) leaves no gap.
+  if (!wide) return frame(sections.map((s) => section(s.id)));
+
+  const perRow = width >= 1280 ? 3 : 2;
+  return frame(
+    <>
+      {DASHBOARD_LAYOUT.top.map(section)}
+      {/* Rows of equal-width boxes. Each box stretches to the tallest in its row, so the bottoms line up. */}
+      {rowsFor(perRow).map((row) => (
+        <View
+          key={row.join()}
+          style={{ flexDirection: 'row', alignItems: 'stretch', gap: TILE_GAP }}
+        >
+          {row.map((id) => (
+            <View key={id} style={{ flex: 1, minWidth: 0, gap: TILE_GAP }}>
+              <FillContext.Provider value>{section(id)}</FillContext.Provider>
+            </View>
+          ))}
+          {/* A short last row keeps the same box width. */}
+          {Array.from({ length: perRow - row.length }, (_, i) => (
+            <View key={`pad${i}`} style={{ flex: 1 }} />
+          ))}
+        </View>
+      ))}
+    </>,
   );
 }
 
@@ -426,20 +496,32 @@ function DemoTools() {
 }
 
 export function SettingsScreen() {
-  const { demo, role, textScale, setTextScale, email, signOut } = useSession();
-  const router = useRouter();
   return (
     <Screen>
       <AppText variant="huge">Settings</AppText>
-      <Card>
-        <AppText variant="title">Text size</AppText>
-        <Segmented
-          options={TEXT_SIZES.map((t) => ({ id: String(t.scale), label: t.label }))}
-          value={String(textScale)}
-          onChange={(v) => setTextScale(Number(v))}
-        />
-        <AppText>This is how large the words look on this device.</AppText>
-      </Card>
+      <SettingsContent />
+    </Screen>
+  );
+}
+
+/** Settings body, shared by the Settings page (patient) and the caregiver one-pager's last section. */
+function SettingsContent() {
+  const { demo, role, textScale, setTextScale, email, signOut } = useSession();
+  const router = useRouter();
+  return (
+    <>
+      {/* Text size is a patient aid; the caregiver screens use a fixed, ordinary size. */}
+      {role === 'patient' ? (
+        <Card>
+          <AppText variant="title">Text size</AppText>
+          <Segmented
+            options={TEXT_SIZES.map((t) => ({ id: String(t.scale), label: t.label }))}
+            value={String(textScale)}
+            onChange={(v) => setTextScale(Number(v))}
+          />
+          <AppText>This is how large the words look on this device.</AppText>
+        </Card>
+      ) : null}
       {demo && role !== 'circle_member' ? <DemoTools /> : null}
       <Card>
         <AppText variant="title">About</AppText>
@@ -459,6 +541,6 @@ export function SettingsScreen() {
           <AppText tone="muted">Family and friends can’t change app settings.</AppText>
         ) : null}
       </Card>
-    </Screen>
+    </>
   );
 }

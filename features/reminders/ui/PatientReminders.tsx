@@ -19,6 +19,8 @@ import {
   dateLabelFor,
   greetingFor,
   KIND,
+  labelOf,
+  taskOf,
   patientError,
   pickPatientFocus,
   type TodayResponse,
@@ -109,7 +111,7 @@ export function PatientReminders() {
       <Card tone="warn">
         <Pic icon={k.icon} />
         <AppText variant="huge" center>
-          {k.task}
+          {taskOf(o)}
         </AppText>
         <AppText center tone="muted">
           {at(o.dueAt, o.timeZone)}
@@ -131,7 +133,7 @@ export function PatientReminders() {
         ) : null}
         {focus.others.length ? (
           <AppText variant="small" tone="muted" center>
-            Also waiting: {focus.others.map((x) => KIND[x.kind].label).join(', ')}
+            Also waiting: {focus.others.map(labelOf).join(', ')}
           </AppText>
         ) : null}
       </Card>
@@ -173,7 +175,7 @@ export function PatientReminders() {
         </AppText>
         {focus.next ? (
           <AppText center tone="muted">
-            Next: {KIND[focus.next.kind].label} at {at(focus.next.dueAt, focus.next.timeZone)}
+            Next: {labelOf(focus.next)} at {at(focus.next.dueAt, focus.next.timeZone)}
           </AppText>
         ) : (
           <AppText center tone="muted">

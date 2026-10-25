@@ -35,6 +35,7 @@ const PLAIN: Record<ReminderKind, string> = {
   brush_teeth: 'Time to brush your teeth',
   shower: 'Time for your shower',
   feed_pets: 'Time to feed your pets',
+  custom: 'Time for your reminder', // never the caregiver's label: push text leaves our servers
 };
 
 export interface ReminderDeps {
@@ -108,6 +109,7 @@ export function createReminderService({ store, bus, notifier, vision, now }: Rem
         scheduleId: s.id,
         patientId: s.patientId,
         kind: s.kind,
+        ...(s.label ? { label: s.label } : {}),
         localDate,
         timeZone: s.timeZone,
         dueAt: due.toISOString(),

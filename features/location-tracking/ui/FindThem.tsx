@@ -101,12 +101,12 @@ export function FindThem() {
   void poll;
   if (!active) {
     return (
-      <View style={{ gap: 8 }}>
-        <AppText variant="small" tone="muted">
-          Finding them in a crowd: their phone is told, then reports exactly where they are for 10
-          minutes. This is recorded below.
-        </AppText>
+      <View style={{ gap: 6 }}>
         <BigButton tone="ghost" label="Find them" busy={busy} onPress={start} />
+        <AppText variant="small" tone="muted">
+          For finding them nearby: their phone is told, then shares exactly where they are for 10
+          minutes. This is recorded.
+        </AppText>
         {problem ? <AppText tone="danger">{problem}</AppText> : null}
       </View>
     );

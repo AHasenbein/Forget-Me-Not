@@ -3,7 +3,7 @@ import { Linking, View } from 'react-native';
 import { ApiError } from '@core/client/api';
 import { formatTime } from '@core/client/format';
 import { useSession } from '@core/client/session';
-import { AppText, BigButton, Card, Icon, Row } from '@core/design-system/components';
+import { AppText, BigButton, Card, Chip, Icon, Row } from '@core/design-system/components';
 import { palette } from '@core/design-system/tokens';
 import type { LocationReading } from '@contracts/location';
 import { FindThem } from './FindThem';
@@ -24,6 +24,7 @@ export function CaregiverLocation() {
   const [busy, setBusy] = useState(false);
   const [problem, setProblem] = useState('');
   const [views, setViews] = useState<ViewRow[]>([]);
+  const [showViews, setShowViews] = useState(false);
 
   const loadViews = async () => {
     try {
@@ -71,10 +72,9 @@ export function CaregiverLocation() {
             Phones share their position about every 5 minutes, and can stop when the battery is low
             or the app is closed. No update never means they are safe.
           </AppText>
-          <Row gap={12}>
+          <Row gap={8}>
             {loc ? (
               <BigButton
-                tone="ghost"
                 label="Open in Maps"
                 onPress={() => Linking.openURL(mapsUrl(loc.lat, loc.lng))}
               />
@@ -85,7 +85,7 @@ export function CaregiverLocation() {
       ) : (
         <>
           <AppText variant="small" tone="muted">
-            Looking is recorded below, so you can always see who checked the location.
+            Every look is recorded, so you can always see who checked the location.
           </AppText>
           <BigButton label="Show last location" busy={busy} onPress={read} />
         </>
@@ -93,16 +93,26 @@ export function CaregiverLocation() {
       {problem ? <AppText tone="danger">{problem}</AppText> : null}
       <FindThem />
 
-      <View style={{ gap: 8, borderTopWidth: 1, borderTopColor: palette.border, paddingTop: 16 }}>
-        <AppText variant="small" bold>
-          Who looked recently
-        </AppText>
-        {views.length === 0 ? (
-          <AppText variant="small" tone="muted">
-            Nobody yet.
-          </AppText>
-        ) : null}
-        {views.slice(0, SHOWN_VIEWS).map((v) => (
+      <View style={{ gap: 6, borderTopWidth: 1, borderTopColor: palette.border, paddingTop: 10 }}>
+        <Row gap={8}>
+          <View style={{ flex: 1 }}>
+            <AppText variant="small" bold>
+              Who looked recently{views.length ? ` (${Math.min(views.length, SHOWN_VIEWS)})` : ''}
+            </AppText>
+          </View>
+          {views.length ? (
+            <Chip
+              label={showViews ? 'Hide' : 'Show'}
+              selected={showViews}
+              onPress={() => setShowViews((v) => !v)}
+            />
+          ) : (
+            <AppText variant="small" tone="muted">
+              Nobody yet.
+            </AppText>
+          )}
+        </Row>
+        {(showViews ? views.slice(0, SHOWN_VIEWS) : []).map((v) => (
           <View key={v.id} style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
             <View style={{ flex: 1, minWidth: 180 }}>
               <AppText variant="small" tone={v.outcome === 'denied' ? 'danger' : undefined}>
