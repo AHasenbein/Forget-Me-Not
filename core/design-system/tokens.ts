@@ -40,11 +40,11 @@ export type Tone = 'neutral' | 'primary' | 'success' | 'warn' | 'danger';
 export const space = { xs: 4, sm: 8, md: 16, lg: 32, xl: 56 } as const;
 /** Two corner radii only. Full rounding is for small status tags, never for cards or buttons. */
 export const radius = { sm: 6, md: 8, pill: 999 } as const;
-/** Fraunces (warm serif) for headlines, Atkinson Hyperlegible (made for low vision) for everything else. */
+/** System font everywhere; only the weight changes. */
 export const font = {
-  display: 'Fraunces_700Bold',
-  body: 'AtkinsonHyperlegible_400Regular',
-  bold: 'AtkinsonHyperlegible_700Bold',
+  display: { fontWeight: '700' },
+  body: { fontWeight: '400' },
+  bold: { fontWeight: '700' },
 } as const;
 
 /** Names of the bundled icon images (core/design-system/icons/*.png). */
