@@ -40,6 +40,17 @@ export function TopBar({ hideBrand }: { hideBrand?: boolean } = {}) {
   const insets = useSafeAreaInsets();
   const onSettings = path === '/settings';
   const patient = role === 'patient';
+  const { width } = useWindowDimensions();
+  // Patient on a wide screen: the persona switcher sits between the flower and Settings (one row, less empty space).
+  // Phones keep it on its own row: the patient-size tabs need the full width.
+  const switcherInline = patient && width >= 640;
+  const switcher = demo ? (
+    <Segmented
+      options={PERSONAS.map((p) => ({ id: p.id, label: p.label }))}
+      value={persona}
+      onChange={setPersona}
+    />
+  ) : null;
   return (
     <View
       style={{
@@ -61,6 +72,7 @@ export function TopBar({ hideBrand }: { hideBrand?: boolean } = {}) {
                 Forget Me Not
               </Text>
             ) : null}
+            {switcherInline ? switcher : null}
           </View>
           {/* Demo badge never shows on patient screens (root rule). */}
           {demo && !patient ? <Badge label="Demo data" tone="warn" /> : null}
@@ -92,13 +104,7 @@ export function TopBar({ hideBrand }: { hideBrand?: boolean } = {}) {
             </Link>
           ) : null}
         </Row>
-        {demo ? (
-          <Segmented
-            options={PERSONAS.map((p) => ({ id: p.id, label: `View as ${p.label.toLowerCase()}` }))}
-            value={persona}
-            onChange={setPersona}
-          />
-        ) : null}
+        {switcherInline ? null : switcher}
       </View>
     </View>
   );

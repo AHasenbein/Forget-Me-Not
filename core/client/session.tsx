@@ -17,8 +17,8 @@ import { authClient } from './supabase';
 
 /** Demo personas map to the demo tokens the API accepts in demo mode. */
 export const PERSONAS = [
-  { id: 'patient', label: 'Patient', role: 'patient' },
-  { id: 'caregiver', label: 'Caregiver', role: 'primary_caregiver' },
+  { id: 'patient', label: 'View as Margaret', role: 'patient' },
+  { id: 'caregiver', label: 'View as caregiver', role: 'primary_caregiver' },
   // Circle members (daughter, friend) come back with the friends-family feature; their accounts and the
   // `demo:daughter` / `demo:friend` tokens still exist, they just have no screen to pick yet.
 ] as const satisfies readonly { id: string; label: string; role: Role }[];
