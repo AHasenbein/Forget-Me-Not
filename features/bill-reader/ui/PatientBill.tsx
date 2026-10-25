@@ -3,6 +3,7 @@ import { Image, Platform, Pressable, View } from 'react-native';
 import { ApiError } from '@core/client/api';
 import { useSession } from '@core/client/session';
 import { AppText, BigButton, Card, Icon } from '@core/design-system/components';
+import type { WidgetProps } from '@core/feature-registry/ui';
 import { palette } from '@core/design-system/tokens';
 import { SAMPLE_BILLS } from '../demo/samples';
 import { BillCamera } from './BillCamera';
@@ -43,11 +44,11 @@ function BillTable({ scan }: { scan: PatientScan }) {
 }
 
 /**
- * Patient: "Look at a bill" (outlined, so the reminder keeps the ONE primary action). Take a picture, choose one
+ * Patient: "Scan bill" (outlined, so the reminder keeps the ONE primary action). Take a picture, choose one
  * (web) or, in the demo, pick a sample bill. The answer is a three-row table in very simple words. It never says
  * "pay it": a bill with scam warning signs says "please don't pay this yet" and the caregiver is told.
  */
-export function PatientBill() {
+export function PatientBill({ collapsed = false }: WidgetProps) {
   const { api, demo } = useSession();
   const [step, setStep] = useState<Step>('closed');
   const [busy, setBusy] = useState(false);
@@ -88,10 +89,12 @@ export function PatientBill() {
     setStep('closed');
   };
 
+  if (collapsed) return null;
+
   return (
     <View style={{ width: '100%', maxWidth: 640, alignSelf: 'center', gap: 12 }}>
       {step === 'closed' ? (
-        <BigButton tone="ghost" label="Look at a bill" onPress={() => setStep('choose')} />
+        <BigButton tone="ghost" label="Scan bill" onPress={() => setStep('choose')} />
       ) : null}
 
       {step === 'choose' ? (
