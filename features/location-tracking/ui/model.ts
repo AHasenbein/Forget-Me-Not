@@ -59,3 +59,19 @@ export function viewTime(iso: string, timeZone?: string): string {
 export function caregiverError(code: string): string {
   return code === 'offline' ? 'Can’t reach the server.' : 'That didn’t work. Please try again.';
 }
+
+export type SharingState = 'starting' | 'started' | 'denied' | 'unavailable';
+
+/** Patient wording: plain, no jargon, never claims more than is true. */
+export function sharingLine(state: SharingState): string {
+  switch (state) {
+    case 'started':
+      return 'Your family can see where you were last.';
+    case 'denied':
+      return 'Location is turned off. Ask someone to turn it on for you.';
+    case 'unavailable':
+      return 'We cannot find your location right now.';
+    default:
+      return 'Finding your location…';
+  }
+}
