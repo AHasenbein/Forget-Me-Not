@@ -73,6 +73,18 @@ Until the Supabase adapter lands, the in-memory store in `server/store.ts` is th
   run at app start, so the app root (shell, shared) must import `tracker/expo.ts` and call `startTracking` after patient
   login; do that in a separate shell change agreed with the other dev.
 
+## UI (`ui/`, dashboard widgets)
+
+- Caregiver widget (order 20, after reminders): "Location" card. The location is NOT read when the dashboard opens: every read
+  is audit-logged, so it is read only on "Show last location" / "Refresh". Shows "Last seen at <time> (within about N m)",
+  never "now"; stale or missing location is shown in warning colour with "no update never means they are safe".
+  "Open in Maps" is a user-initiated link (no third-party map tiles are fetched, so the area is not leaked).
+- "Who looked recently": last 5 rows of `GET /views` in plain words (Caregiver / Family member / Lost-button alert; blocked
+  attempts in red). Never shows ids or coordinates.
+- No patient widget: the device tracker is not wired into the app yet, so a "sharing your location" status would be untrue.
+
 ## Later PRs
 
-PR 3: caregiver map screen ("last seen", "Demo data" badge) and the patient "sharing your location" status.
+- Wire the device tracker into the app shell (shared change, agree with the other dev; needs a dev build).
+- Patient "sharing your location" status once the tracker runs.
+- A map view: needs a decision on a tile provider (privacy: tiles reveal the area) or a native map SDK (new EAS build).
