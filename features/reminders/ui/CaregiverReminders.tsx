@@ -12,11 +12,12 @@ import {
   Chip,
   Field,
   Hero,
+  Icon,
   IconCircle,
   Row,
   Segmented,
   Stack,
-  StatTile,
+  Ledger,
 } from '@core/design-system/components';
 import { palette } from '@core/design-system/tokens';
 import type { ReminderKind, Schedule } from '../schemas';
@@ -133,47 +134,44 @@ export function CaregiverReminders() {
       </Card>
     ) : (
       <Hero>
-        <View style={{ gap: 2 }}>
+        <View style={{ gap: 6 }}>
           <AppText variant="small" tone="inverseMuted">
-            {today.data ? dateLabelFor(today.data.now, tz) : ' '}
+            Today · {today.data ? dateLabelFor(today.data.now, tz) : ''}
           </AppText>
-          <AppText variant="huge" tone="inverse">
-            Today
-          </AppText>
-        </View>
-        <Row gap={14}>
-          <IconCircle
-            icon={allClear ? 'check' : 'alert'}
-            size={60}
-            tone={allClear ? 'success' : 'warn'}
-          />
-          <View style={{ flex: 1, minWidth: 200 }}>
-            <AppText variant="title" tone="inverse">
+          <Row gap={14}>
+            <Icon
+              name={allClear ? 'check' : 'alert'}
+              size={40}
+              color={allClear ? palette.sunflower : '#FFB4BF'}
+            />
+            <AppText variant="huge" tone="inverse">
               {allClear ? 'All on track' : `${counts.attention + reviews.length} to look at`}
             </AppText>
-            <AppText variant="small" tone="inverseMuted">
-              {history.data
-                ? `Last ${history.data.days} days: ${history.data.summary.confirmed} done, ${history.data.summary.missed} missed, ${history.data.summary.skipped} skipped`
-                : 'Checking in…'}
-            </AppText>
-          </View>
-        </Row>
+          </Row>
+          <AppText variant="small" tone="inverseMuted">
+            {history.data
+              ? `Last ${history.data.days} days: ${history.data.summary.confirmed} done, ${history.data.summary.missed} missed, ${history.data.summary.skipped} skipped`
+              : 'Checking in…'}
+          </AppText>
+        </View>
         {nextItem && today.data ? (
           <AppText variant="small" tone="inverseMuted">
             Next: {KIND[nextItem.kind].label} {untilLabel(today.data.now, nextItem.dueAt)} (
             {formatTime(nextItem.dueAt, nextItem.timeZone)})
           </AppText>
         ) : null}
-        <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 10 }}>
-          <StatTile inverse value={counts.done} label="done" />
-          <StatTile inverse value={counts.upcoming} label="coming up" />
-          <StatTile
-            inverse
-            value={counts.attention}
-            label="need attention"
-            tone={counts.attention ? 'danger' : 'neutral'}
-          />
-        </View>
+        <Ledger
+          inverse
+          items={[
+            { value: counts.done, label: 'done' },
+            { value: counts.upcoming, label: 'coming up' },
+            {
+              value: counts.attention,
+              label: 'need attention',
+              tone: counts.attention ? 'danger' : 'neutral',
+            },
+          ]}
+        />
       </Hero>
     );
   const weekEl = week ? <WeekCard week={week} pct={pct} /> : null;
@@ -193,7 +191,7 @@ export function CaregiverReminders() {
       {attention.map((r) => (
         <Card key={r.occurrence.id} tone="danger">
           <Row gap={14}>
-            <IconCircle icon={KIND[r.occurrence.kind].icon} size={56} tone="danger" />
+            <IconCircle icon={KIND[r.occurrence.kind].icon} size={36} tone="danger" />
             <View style={{ flex: 1, minWidth: 180 }}>
               <AppText variant="title" tone="danger">
                 {KIND[r.occurrence.kind].label} missed
@@ -229,7 +227,7 @@ export function CaregiverReminders() {
           {rows.length === 0 ? <AppText tone="muted">Nothing scheduled for today.</AppText> : null}
           {rows.map((r, i) => (
             <View key={r.occurrence.id} style={[styles.rowItem, i > 0 && styles.rowDivider]}>
-              <IconCircle icon={KIND[r.occurrence.kind].icon} size={48} tone={r.tone} />
+              <IconCircle icon={KIND[r.occurrence.kind].icon} size={30} tone={r.tone} />
               <View style={{ flex: 1, minWidth: 140, gap: 6 }}>
                 <AppText bold>{KIND[r.occurrence.kind].label}</AppText>
                 {r.occurrence.snoozeCount ? (
@@ -256,7 +254,7 @@ export function CaregiverReminders() {
           {list.map((s, i) => (
             <View key={s.id} style={[{ gap: 10 }, i > 0 && styles.rowDivider]}>
               <View style={styles.rowItem}>
-                <IconCircle icon={KIND[s.kind].icon} size={48} />
+                <IconCircle icon={KIND[s.kind].icon} size={30} />
                 <View style={{ flex: 1, minWidth: 140 }}>
                   <AppText bold>
                     {KIND[s.kind].label} · {formatTime(`2026-01-01T${s.localTime}:00Z`, 'UTC')}
@@ -300,7 +298,7 @@ export function CaregiverReminders() {
           ) : null}
           {(audit.data ?? []).map((a, i) => (
             <View key={a.id} style={[styles.rowItem, i > 0 && styles.rowDivider]}>
-              <IconCircle icon={a.action === 'pill_frames_viewed' ? 'camera' : 'check'} size={44} />
+              <IconCircle icon={a.action === 'pill_frames_viewed' ? 'camera' : 'check'} size={30} />
               <View style={{ flex: 1, minWidth: 140 }}>
                 <AppText>{auditLabel(a.action)}</AppText>
                 <AppText variant="small" tone="muted">
@@ -423,7 +421,7 @@ function WeekCard({ week, pct }: { week: DayBar[]; pct: number | null }) {
                 width: '100%',
                 height: H,
                 justifyContent: 'flex-end',
-                borderRadius: 10,
+                borderRadius: 3,
                 backgroundColor: palette.sunken,
                 overflow: 'hidden',
               }}
@@ -480,7 +478,7 @@ function ReviewCard({
               key={i}
               accessibilityLabel={`Photo ${i + 1}`}
               source={{ uri: `data:${f.mediaType};base64,${f.data}` }}
-              style={{ width: 140, height: 105, borderRadius: 8, backgroundColor: '#ddd' }}
+              style={{ width: 140, height: 105, borderRadius: 6, backgroundColor: '#ddd' }}
             />
           ))}
         </View>

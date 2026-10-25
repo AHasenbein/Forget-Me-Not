@@ -1,3 +1,7 @@
+import { useFonts } from 'expo-font';
+import fraunces from '../design-system/fonts/Fraunces_700Bold.ttf';
+import atkinson400 from '../design-system/fonts/AtkinsonHyperlegible_400Regular.ttf';
+import atkinson700 from '../design-system/fonts/AtkinsonHyperlegible_700Bold.ttf';
 import { Link, usePathname, useRouter } from 'expo-router';
 import { useState, type ReactNode } from 'react';
 import { Pressable, Text, useWindowDimensions, View } from 'react-native';
@@ -13,7 +17,7 @@ import {
   Segmented,
   Screen,
 } from '../design-system/components';
-import { palette } from '../design-system/tokens';
+import { font, palette } from '../design-system/tokens';
 import { ApiError } from './api';
 import { usePoll } from './hooks';
 import { formatTime } from './format';
@@ -45,7 +49,7 @@ export function TopBar({ hideBrand }: { hideBrand?: boolean } = {}) {
             {!patient && !hideBrand ? (
               <Text
                 numberOfLines={1}
-                style={{ fontSize: 18, fontWeight: '700', color: palette.text }}
+                style={{ fontSize: 18, fontFamily: font.bold, color: palette.text }}
               >
                 Forget Me Not
               </Text>
@@ -64,7 +68,7 @@ export function TopBar({ hideBrand }: { hideBrand?: boolean } = {}) {
                   minWidth: 64,
                   alignItems: 'center',
                   justifyContent: 'center',
-                  borderRadius: 32,
+                  borderRadius: 8,
                   backgroundColor: palette.card,
                   borderWidth: 1,
                   borderColor: palette.border,
@@ -73,7 +77,7 @@ export function TopBar({ hideBrand }: { hideBrand?: boolean } = {}) {
               >
                 <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
                   <Icon name={onSettings ? 'back' : 'sliders'} size={26} />
-                  <Text style={{ fontSize: 24, fontWeight: '700', color: palette.text }}>
+                  <Text style={{ fontSize: 24, fontFamily: font.bold, color: palette.text }}>
                     {onSettings ? 'Back' : 'Settings'}
                   </Text>
                 </View>
@@ -130,8 +134,8 @@ export function BottomNav() {
                 style={{
                   paddingHorizontal: 24,
                   paddingVertical: 6,
-                  borderRadius: 999,
-                  backgroundColor: on ? palette.primaryBg : 'transparent',
+                  borderTopWidth: 3,
+                  borderTopColor: on ? palette.primary : 'transparent',
                   alignItems: 'center',
                 }}
               >
@@ -139,7 +143,7 @@ export function BottomNav() {
                 <Text
                   style={{
                     fontSize: 16,
-                    fontWeight: '700',
+                    fontFamily: font.bold,
                     color: on ? palette.primary : palette.muted,
                   }}
                 >
@@ -169,7 +173,7 @@ function Sidebar() {
     >
       <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10, marginBottom: 24 }}>
         <Icon name="flower" size={40} />
-        <Text style={{ fontSize: 20, fontWeight: '800', color: '#FFFFFF', flex: 1 }}>
+        <Text style={{ fontSize: 20, fontFamily: font.bold, color: '#FFFFFF', flex: 1 }}>
           Forget Me Not
         </Text>
       </View>
@@ -186,12 +190,14 @@ function Sidebar() {
                 alignItems: 'center',
                 gap: 14,
                 paddingHorizontal: 16,
-                borderRadius: 16,
+                borderRadius: 6,
                 backgroundColor: on ? 'rgba(255,255,255,0.16)' : 'transparent',
               }}
             >
               <Icon name={n.icon} size={26} color="#FFFFFF" />
-              <Text style={{ fontSize: 20, fontWeight: '700', color: '#FFFFFF' }}>{n.label}</Text>
+              <Text style={{ fontSize: 20, fontFamily: font.bold, color: '#FFFFFF' }}>
+                {n.label}
+              </Text>
             </Pressable>
           </Link>
         );
@@ -203,8 +209,15 @@ function Sidebar() {
 /** Root frame: optional sidebar on wide screens, then top bar, page and (narrow) bottom bar. */
 export function AppFrame({ children }: { children: ReactNode }) {
   const { role, liveStatus } = useSession();
+  const [fontsReady, fontError] = useFonts({
+    Fraunces_700Bold: fraunces,
+    AtkinsonHyperlegible_400Regular: atkinson400,
+    AtkinsonHyperlegible_700Bold: atkinson700,
+  });
   const wide = useWindowDimensions().width >= 900;
   const side = wide && role === 'primary_caregiver' && liveStatus === 'ready';
+  // Wait for the fonts (a moment); if they fail to load, carry on with the system font rather than a blank app.
+  if (!fontsReady && !fontError) return <View style={{ flex: 1, backgroundColor: palette.bg }} />;
   return (
     <View style={{ flex: 1, flexDirection: 'row', backgroundColor: palette.bg }}>
       {side ? <Sidebar /> : null}
