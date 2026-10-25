@@ -1,8 +1,9 @@
 import { serve } from '@hono/node-server';
 import { Hono } from 'hono';
 import { cors } from 'hono/cors';
-import Anthropic from '@anthropic-ai/sdk';
-import { createClaudeVision } from '../core/ai/claude-vision';
+import { createOpenRouterDocuments } from '../core/ai/openrouter-documents';
+import { createOpenRouterText } from '../core/ai/openrouter-text';
+import { createOpenRouterVision } from '../core/ai/openrouter-vision';
 import { createClient } from '@supabase/supabase-js';
 import { createQuickLogin } from '../core/auth/quick-login';
 import { createVerifier, supabaseAuthPorts } from '../core/auth/supabase-verifier';
@@ -15,6 +16,9 @@ import { startJobs } from '../core/jobs/runner';
 import { getProviders, registerLive } from '../core/providers';
 import { createApp } from '../core/server/app';
 
+// Accept the common misspelling too: OPEN_ROUTER_API_KEY.
+const openRouterKey = process.env.OPENROUTER_API_KEY || process.env.OPEN_ROUTER_API_KEY;
+
 const manifests = await discoverManifests();
 loadEnv(manifests.filter((m) => isEnabled(m))); // fails fast on bad env
 const world = buildDemoWorld();
@@ -23,8 +27,30 @@ const world = buildDemoWorld();
 if (!isDemo()) registerLive('verifier', createVerifier(supabaseAuthPorts(serviceClient())));
 // Real photo checks only when asked for (DATA_MODE_VISION=live) AND a key exists; otherwise the canned check.
 if (dataMode('vision') === 'live') {
-  if (!process.env.AI_API_KEY) throw new Error('DATA_MODE_VISION=live needs AI_API_KEY in .env');
-  registerLive('vision', createClaudeVision(new Anthropic({ apiKey: process.env.AI_API_KEY })));
+  const apiKey = openRouterKey;
+  const model = process.env.OPENROUTER_MODEL;
+  if (!apiKey) throw new Error('DATA_MODE_VISION=live needs OPENROUTER_API_KEY in .env');
+  registerLive('vision', createOpenRouterVision({ apiKey, model: model || undefined }));
+}
+// Bill reader (photo of a bill -> plain description): live only when asked for (DATA_MODE_DOCUMENTS=live).
+if (dataMode('documents') === 'live') {
+  const apiKey = openRouterKey;
+  if (!apiKey) throw new Error('DATA_MODE_DOCUMENTS=live needs OPENROUTER_API_KEY in .env');
+  registerLive(
+    'documents',
+    createOpenRouterDocuments({
+      apiKey,
+      model: process.env.OPENROUTER_MODEL || undefined,
+      fallbackModel: process.env.OPENROUTER_FALLBACK_MODEL || undefined,
+    }),
+  );
+}
+// Text AI (e.g. the money check's second opinion): live only when asked for (DATA_MODE_AI=live), and then it needs a key.
+if (dataMode('ai') === 'live') {
+  const apiKey = openRouterKey;
+  const model = process.env.OPENROUTER_MODEL;
+  if (!apiKey) throw new Error('DATA_MODE_AI=live needs OPENROUTER_API_KEY in .env');
+  registerLive('ai', createOpenRouterText({ apiKey, model: model || undefined }));
 }
 const { verifier } = getProviders({ world });
 

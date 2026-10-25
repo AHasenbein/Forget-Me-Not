@@ -18,6 +18,7 @@ export const registerLive = <K extends keyof Providers>(key: K, impl: Providers[
 const SERVICE_OF: Record<keyof Providers, Service> = {
   ai: 'ai',
   vision: 'vision',
+  documents: 'documents',
   plaid: 'plaid',
   notifier: 'notifier',
   location: 'location',

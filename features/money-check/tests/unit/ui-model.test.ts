@@ -1,7 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { REASONS } from '../../schemas';
 import {
-  KIND_CHOICES,
   caregiverError,
   caregiverReason,
   dollars,
@@ -20,22 +19,32 @@ describe('patient wording', () => {
     for (const s of ['waiting', 'no_one_reachable', 'dont_pay'] as const)
       expect(JSON.stringify(patientStatusText(s))).toMatch(/don.t pay/i);
     expect(patientStatusText('ok_to_go').title).toMatch(/caregiver says/i);
+    // an auto-cleared payment must NOT claim the caregiver said so
+    expect(JSON.stringify(patientStatusText('looks_ok'))).not.toMatch(/caregiver says|don.t pay/i);
+    expect(patientStatusText('looks_ok').title).toMatch(/looks OK/i);
   });
   it('has no digits, codes or money in any patient text', () => {
     const all = [
-      ...(['waiting', 'no_one_reachable', 'ok_to_go', 'dont_pay'] as const).map((s) =>
+      ...(['waiting', 'no_one_reachable', 'ok_to_go', 'looks_ok', 'dont_pay'] as const).map((s) =>
         JSON.stringify(patientStatusText(s)),
       ),
       ...REASONS.map((r) => patientReason([r]) ?? ''),
       patientError('offline'),
       patientError('x'),
-      ...KIND_CHOICES.map((c) => c.label),
     ].join(' ');
     expect(all).not.toMatch(/\d|\$|error|code|http/i);
   });
   it('explains the scam reasons in one calm sentence', () => {
     expect(patientReason(['gift_card_payment'])).toMatch(/never paid with gift cards/i);
     expect(patientReason(['known_bill'])).toBeNull();
+  });
+});
+
+describe('looks-OK timing', () => {
+  it('stays 5 s, and a tap only counts after 1 s', async () => {
+    const { LOOKS_OK_MS, LOOKS_OK_TAP_AFTER_MS } = await import('../../ui/model');
+    expect(LOOKS_OK_MS).toBe(5000);
+    expect(LOOKS_OK_TAP_AFTER_MS).toBe(1000);
   });
 });
 

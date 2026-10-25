@@ -173,3 +173,37 @@ describe('flag off', () => {
     }
   });
 });
+
+describe('typed note over HTTP', () => {
+  beforeEach(() => {
+    clock.setTime('2026-01-01T12:00:00Z');
+    resetRuntime({ notifier: createMockNotifier(), plaid: createMockPlaid([]), now: clock.now });
+    setCaregivers(patient.id, [caregiver.id]);
+  });
+  it('accepts a note, rejects empty, too long, extra fields, and a client-chosen "described" kind', async () => {
+    expect((await call('POST', '/requests', patient, { note: 'a new sofa' })).status).toBe(200);
+    resetRuntime({ notifier: createMockNotifier(), plaid: createMockPlaid([]), now: clock.now });
+    setCaregivers(patient.id, [caregiver.id]);
+    for (const body of [
+      { note: '' },
+      { note: 'ab' },
+      { note: 'x'.repeat(201) },
+      { note: 'a new sofa', kind: 'bill' },
+      { kind: 'described' },
+      {},
+    ])
+      expect((await call('POST', '/requests', patient, body)).status).toBe(400);
+  });
+  it('only the caregiver sees the note; circle members and strangers get nothing', async () => {
+    await call('POST', '/requests', patient, { note: 'a new sofa' });
+    const asPatient = await (await call('GET', '/requests/active', patient)).text();
+    expect(asPatient).not.toMatch(/sofa/);
+    expect(await (await call('GET', '/requests/active', caregiver)).text()).toMatch(/sofa/);
+    expect((await call('GET', '/requests/active', daughter)).status).toBe(403);
+    expect(await (await call('GET', '/requests/active', otherCaregiver)).text()).not.toMatch(
+      /sofa/,
+    ); // another patient's caregiver: scoped, nothing
+    expect((await call('POST', '/requests', daughter, { note: 'a new sofa' })).status).toBe(403);
+    expect((await call('POST', '/requests', undefined, { note: 'a new sofa' })).status).toBe(401);
+  });
+});

@@ -1,11 +1,30 @@
 import type { AuthUser } from '@core/auth/types';
 import type { EventBus } from '@core/events/bus';
 import type { Notifier } from '@core/notifications';
+import type { AiClient } from '@core/ai/client';
 import type { PlaidPort } from '@core/providers/types';
 import { HttpError } from '@core/server/errors';
-import { DAY_MS, MAX_REQUESTS_PER_DAY, OUTCOME_MS, REQUEST_TTL_MS } from './constants';
-import { assess } from './rules';
+import {
+  AI_TIMEOUT_MS,
+  CLEARED_VISIBLE_MS,
+  DAY_MS,
+  MAX_REQUESTS_PER_DAY,
+  OUTCOME_MS,
+  REQUEST_TTL_MS,
+} from './constants';
+import {
+  AI_TASK,
+  aiPrompt,
+  assess,
+  assessNote,
+  canAutoClear,
+  mergeAi,
+  parseAiVerdict,
+  redactNote,
+} from './rules';
 import type { Kind, MoneyRequest, PatientStatus } from './schemas';
+
+export type CreateInput = { kind: Exclude<Kind, 'described'> } | { note: string };
 import type { RequestStore } from './store';
 
 export interface MoneyCheckDeps {
@@ -13,6 +32,8 @@ export interface MoneyCheckDeps {
   bus: EventBus;
   notifier: () => Notifier; // lazy: resolved only when a push is actually sent
   plaid: () => PlaidPort;
+  /** Lazy and optional: no live text model yet, so a throw or a missing one simply means "rules only". */
+  ai?: () => AiClient;
   /** Current primary caregiver(s) of a patient, looked up on every push so an unlinked caregiver stops receiving. */
   caregiversOf: (patientId: string) => string[];
   now: () => Date;
@@ -26,6 +47,7 @@ export function createMoneyCheckService({
   bus,
   notifier,
   plaid,
+  ai,
   caregiversOf,
   now,
 }: MoneyCheckDeps) {
@@ -44,7 +66,7 @@ export function createMoneyCheckService({
   };
   const audit = (
     r: MoneyRequest,
-    action: 'created' | 'approved' | 'declined' | 'expired',
+    action: 'created' | 'approved' | 'declined' | 'expired' | 'auto_cleared',
     by: string | null,
   ) =>
     store.addAudit({
@@ -70,13 +92,15 @@ export function createMoneyCheckService({
   };
 
   const patientStatus = (r: MoneyRequest): PatientStatus =>
-    r.status === 'approved'
-      ? 'ok_to_go'
-      : r.status === 'declined'
-        ? 'dont_pay'
-        : r.delivered
-          ? 'waiting'
-          : 'no_one_reachable';
+    r.status === 'cleared'
+      ? 'looks_ok'
+      : r.status === 'approved'
+        ? 'ok_to_go'
+        : r.status === 'declined'
+          ? 'dont_pay'
+          : r.delivered
+            ? 'waiting'
+            : 'no_one_reachable';
 
   /** The patient sees a status and plain reason codes. Never a payee or an amount. */
   const patientView = (r: MoneyRequest) => ({
@@ -87,9 +111,28 @@ export function createMoneyCheckService({
     since: r.createdAt,
   });
 
+  /** A model's second opinion on a typed note. null on ANY problem (no model, error, timeout, bad JSON): rules still decide. */
+  const askAi = async (note: string) => {
+    if (!ai) return null;
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    try {
+      const reply = await Promise.race([
+        ai().complete({ task: AI_TASK, content: aiPrompt(note) }),
+        new Promise<never>((_, reject) => {
+          timer = setTimeout(() => reject(new Error('timeout')), AI_TIMEOUT_MS);
+        }),
+      ]);
+      return parseAiVerdict(reply.text, reply.confidence);
+    } catch {
+      return null;
+    } finally {
+      clearTimeout(timer);
+    }
+  };
+
   return {
     /** The patient asks "may I pay this?". Idempotent while a request is open (repeated taps, same request, no second push). */
-    async create(user: AuthUser, input: { kind: Kind }) {
+    async create(user: AuthUser, input: CreateInput) {
       requireRole(user, 'patient');
       const patientId = patientOf(user);
       const open = store.getOpen(patientId);
@@ -102,26 +145,48 @@ export function createMoneyCheckService({
       if (store.countSince(patientId, since) >= MAX_REQUESTS_PER_DAY)
         throw new HttpError(429, 'too_many');
 
+      const note = 'note' in input ? redactNote(input.note) : null;
+      const tapKind = 'kind' in input ? input.kind : null;
+      const needBills = note !== null || tapKind === 'bill';
       let bills: Awaited<ReturnType<PlaidPort['listTransactions']>> = [];
-      if (input.kind === 'bill') {
+      if (needBills) {
         try {
           bills = await plaid().listTransactions(patientId);
         } catch {
           // bank unavailable: no matching bill => "check", never "ok"
         }
       }
-      // A concurrent tap may have created the request while we awaited the bank.
+      // Rules are the floor. For typed text a model may add a second opinion, but it can only raise the level.
+      let verdict =
+        note !== null ? assessNote(note, bills) : { ...assess(tapKind!, bills), kind: tapKind! };
+      let cleared = false;
+      let aiChecked = false;
+      if (note !== null) {
+        const ai = await askAi(note);
+        aiChecked = ai !== null;
+        verdict = { ...verdict, ...mergeAi(verdict, ai) };
+        cleared = canAutoClear(verdict, ai);
+        // "Ordinary" by the rules but no confident model second opinion: a person looks, never a silent "ok".
+        if (verdict.level === 'ok' && !cleared)
+          verdict = {
+            ...verdict,
+            level: 'check',
+            reasons: [...new Set([...verdict.reasons, 'ai_unsure' as const])],
+          };
+      }
+      // A concurrent tap may have created the request while we awaited the bank / model.
       const raced = store.getOpen(patientId);
       if (raced) return { request: patientView(raced), alreadyOpen: true };
 
-      const verdict = assess(input.kind, bills);
       const r: MoneyRequest = {
         id: crypto.randomUUID(),
         patientId,
-        kind: input.kind,
+        kind: verdict.kind,
         level: verdict.level,
         reasons: verdict.reasons,
         billId: verdict.bill?.id ?? null,
+        note,
+        aiChecked,
         createdAt: now().toISOString(),
         expiresAt: new Date(now().getTime() + REQUEST_TTL_MS).toISOString(),
         status: 'pending',
@@ -129,6 +194,19 @@ export function createMoneyCheckService({
         decidedBy: null,
         decidedAt: null,
       };
+      if (cleared) {
+        // Ordinary everyday payment: no push, no alert. The patient is told it looks OK; the caregiver can see it later.
+        const done: MoneyRequest = {
+          ...r,
+          status: 'cleared',
+          decidedBy: null,
+          decidedAt: r.createdAt,
+        };
+        store.put(done);
+        audit(done, 'created', user.id);
+        audit(done, 'auto_cleared', null);
+        return { request: patientView(done), alreadyOpen: false };
+      }
       store.put(r);
       audit(r, 'created', user.id);
       await bus.emit('caregiver.alert', {
@@ -159,7 +237,11 @@ export function createMoneyCheckService({
         // Show the outcome of the latest decision for a while, so the patient is never left guessing.
         return { request: r && r.status === 'pending' ? patientView(r) : latestOutcome() };
       }
-      if (!r || r.status !== 'pending') return { request: null, bill: null };
+      const cleared = store
+        .clearedSince(patientId, new Date(now().getTime() - CLEARED_VISIBLE_MS).toISOString())
+        .slice(0, 3)
+        .map((c) => ({ note: c.note, at: c.createdAt }));
+      if (!r || r.status !== 'pending') return { request: null, bill: null, cleared };
       let bill = null;
       if (r.billId) {
         try {
@@ -168,7 +250,7 @@ export function createMoneyCheckService({
           // bank unavailable: the request is still shown
         }
       }
-      return { request: r, bill };
+      return { request: r, bill, cleared };
 
       function latestOutcome() {
         const done = store.latestDecided(patientId);
@@ -185,7 +267,10 @@ export function createMoneyCheckService({
       const status = decision === 'approve' ? 'approved' : 'declined';
       if (r.status === status && r.decidedBy === user.id) return r; // repeated tap by the same caregiver
       if (r.status !== 'pending')
-        throw new HttpError(409, r.decidedBy === null ? 'expired' : 'already_decided');
+        throw new HttpError(
+          409,
+          r.status === 'cleared' || r.decidedBy !== null ? 'already_decided' : 'expired',
+        );
       const done: MoneyRequest = {
         ...r,
         status,

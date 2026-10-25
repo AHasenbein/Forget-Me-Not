@@ -45,7 +45,7 @@ export default defineFeature({
   nav: [], // screens are dashboard widgets (ui/index.tsx)
   permissions: ['money_check.ask', 'money_check.decide'],
   events: { emits: ['caregiver.alert'], consumes: [] },
-  migrations: ['money-check__202610250100_init.sql'],
+  migrations: ['money-check__202610250100_init.sql', 'money-check__202610250200_note.sql'],
   jobs: [
     {
       name: 'money-check.sweep', // unanswered requests become "don't pay"; ticks faster with the demo clock
