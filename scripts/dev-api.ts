@@ -38,7 +38,11 @@ if (dataMode('documents') === 'live') {
   if (!apiKey) throw new Error('DATA_MODE_DOCUMENTS=live needs OPENROUTER_API_KEY in .env');
   registerLive(
     'documents',
-    createOpenRouterDocuments({ apiKey, model: process.env.OPENROUTER_MODEL || undefined }),
+    createOpenRouterDocuments({
+      apiKey,
+      model: process.env.OPENROUTER_MODEL || undefined,
+      fallbackModel: process.env.OPENROUTER_FALLBACK_MODEL || undefined,
+    }),
   );
 }
 // Text AI (e.g. the money check's second opinion): live only when asked for (DATA_MODE_AI=live), and then it needs a key.

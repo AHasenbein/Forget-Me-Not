@@ -28,6 +28,9 @@ const SCHEMA = {
   additionalProperties: false,
 } as const;
 
+/** Used when the main model stays rate-limited or down after a retry (any vision-capable model works). */
+export const DEFAULT_FALLBACK_MODEL = 'openai/gpt-4o-mini';
+
 interface ChatResponse {
   choices?: {
     finish_reason?: string;
@@ -45,15 +48,16 @@ export function createOpenRouterDocuments({
   model = DEFAULT_VISION_MODEL,
   fetchImpl = fetch,
   retryDelayMs = 2000,
-}: OpenRouterDeps & { retryDelayMs?: number }): DocumentReader {
+  fallbackModel = DEFAULT_FALLBACK_MODEL,
+}: OpenRouterDeps & { retryDelayMs?: number; fallbackModel?: string }): DocumentReader {
   return {
     async readBill(frames: readonly VisionFrame[]) {
-      const send = () =>
+      const send = (useModel: string) =>
         fetchImpl(OPENROUTER_URL, {
           method: 'POST',
           headers: { authorization: `Bearer ${apiKey}`, 'content-type': 'application/json' },
           body: JSON.stringify({
-            model,
+            model: useModel,
             max_tokens: 1000,
             temperature: 0,
             response_format: {
@@ -75,11 +79,16 @@ export function createOpenRouterDocuments({
             ],
           }),
         });
-      // Providers rate-limit now and then (429) or hiccup (5xx): two calm retries before giving up.
-      let res = await send();
-      for (let retry = 0; retry < 2 && (res.status === 429 || res.status >= 500); retry++) {
+      let res = await send(model);
+      const retryable = (r: Response) => r.status === 429 || r.status >= 500;
+      // Providers rate-limit now and then (429) or hiccup (5xx): try again once, then use the fallback model.
+      if (retryable(res)) {
         await new Promise((r) => setTimeout(r, retryDelayMs));
-        res = await send();
+        res = await send(model);
+      }
+      if (retryable(res) && fallbackModel && fallbackModel !== model) {
+        await new Promise((r) => setTimeout(r, retryDelayMs));
+        res = await send(fallbackModel);
       }
       if (!res.ok) {
         // OpenRouter's error text describes the failure (rate limit, credits...); it never contains the picture.

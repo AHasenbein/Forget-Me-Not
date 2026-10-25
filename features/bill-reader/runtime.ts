@@ -39,9 +39,11 @@ export function getService(): BillReaderService {
       store: getStore(),
       bus,
       documents: () => overrides.documents ?? (providers ??= getProviders()).documents,
-      // Canned answers only while the bill reader's AI is in demo mode. With the real AI on (DATA_MODE_DOCUMENTS=live),
-      // the sample pictures go through the model like any photo: that is what "uses AI" means.
-      sampleReading: (sha) => (isDemo('documents') ? (samples.get(sha) ?? null) : null),
+      // Canned answers are used while the bill reader's AI is in demo mode. With the real AI on
+      // (DATA_MODE_DOCUMENTS=live) the sample pictures go through the model first, like any photo; the canned
+      // answer is then only the safety net if the model is down.
+      sampleReading: (sha) => samples.get(sha) ?? null,
+      preferModel: () => !isDemo('documents'),
       now: () => (overrides.now ?? now)(),
     });
     builtWith = bus;

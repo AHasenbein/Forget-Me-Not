@@ -15,8 +15,10 @@ export interface BillReaderDeps {
   bus: EventBus;
   /** Lazy: only a scan needs the model. */
   documents: () => DocumentReader;
-  /** Demo samples: a picture whose sha256 is registered here is answered from the canned list, not the model. */
+  /** Demo samples: a picture whose sha256 is registered here has a canned answer. */
   sampleReading: (sha256: string) => BillReading | null;
+  /** True when the real AI is switched on: samples then go through the model first, and the canned answer is only the safety net. */
+  preferModel: () => boolean;
   now: () => Date;
 }
 
@@ -27,6 +29,7 @@ export function createBillReaderService({
   bus,
   documents,
   sampleReading,
+  preferModel,
   now,
 }: BillReaderDeps) {
   const patientOf = (user: AuthUser): string => {
@@ -60,7 +63,7 @@ export function createBillReaderService({
     frames: VisionFrame[],
   ): Promise<{ reading: BillReading | null; source: Source }> {
     const sample = sampleReading(fingerprint(frames[0]!.data));
-    if (sample) return { reading: sample, source: 'sample' };
+    if (sample && !preferModel()) return { reading: sample, source: 'sample' };
     let timer: ReturnType<typeof setTimeout> | undefined;
     try {
       const reading = await Promise.race([
@@ -72,7 +75,8 @@ export function createBillReaderService({
       return { reading, source: 'ai' };
     } catch (err) {
       logger.error('bill read failed', { err: String(err) }); // never the picture or its contents
-      return { reading: null, source: 'ai' };
+      // A demo sample has a known answer: if the AI is down on stage, use it (marked as a sample), not "could not read".
+      return sample ? { reading: sample, source: 'sample' } : { reading: null, source: 'ai' };
     } finally {
       clearTimeout(timer);
     }

@@ -29,6 +29,7 @@ let store: MemoryScanStore;
 let alerts: unknown[];
 let readBill: ReturnType<typeof vi.fn>;
 let samples: Record<string, BillReading>;
+let preferModel = false;
 let svc: ReturnType<typeof createBillReaderService>;
 
 const build = (impl: (f: unknown) => Promise<BillReading> = async () => water) => {
@@ -41,6 +42,7 @@ const build = (impl: (f: unknown) => Promise<BillReading> = async () => water) =
     bus,
     documents: () => ({ readBill: readBill as never }),
     sampleReading: (sha) => samples[sha] ?? null,
+    preferModel: () => preferModel,
     now: clock.now,
   });
 };
@@ -57,6 +59,7 @@ beforeEach(() => {
   clock.setTime('2026-10-24T12:00:00Z');
   store = new MemoryScanStore();
   samples = {};
+  preferModel = false;
   build();
 });
 
@@ -123,6 +126,23 @@ describe('scan', () => {
     expect(scan.payee).toBe('Sample Co');
     expect(readBill).not.toHaveBeenCalled();
     expect(svc.list(caregiver).scans[0]!.source).toBe('sample');
+  });
+  it('with the real AI on, a sample goes through the model first; if the model is down the canned answer is the safety net', async () => {
+    const { createHash } = await import('node:crypto');
+    samples[createHash('sha256').update(JPEG).digest('hex')] = { ...water, payee: 'Sample Co' };
+    preferModel = true;
+    expect((await svc.scan(patient, jpeg)).scan.payee).toBe('Fictional Water Co'); // the model's answer
+    expect(svc.list(caregiver).scans[0]!.source).toBe('ai');
+    build(async () => {
+      throw new Error('429');
+    });
+    const { scan } = await svc.scan(patient, jpeg);
+    expect(scan).toMatchObject({ outcome: 'read', payee: 'Sample Co' });
+    expect(svc.list(caregiver).scans[0]!.source).toBe('sample');
+    // a picture that is NOT a sample still honestly says "could not read" when the model is down
+    expect(
+      (await svc.scan(patient, [{ mediaType: 'image/jpeg', data: `${JPEG}AAAA` }])).scan.outcome,
+    ).toBe('unclear');
   });
   it('the picture itself is never stored or returned', async () => {
     await svc.scan(patient, jpeg);

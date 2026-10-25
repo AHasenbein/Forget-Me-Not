@@ -27,32 +27,31 @@ const run = (f: ReturnType<typeof fake>) =>
   }).readBill(frames);
 
 describe('openrouter documents adapter', () => {
-  it('retries on a 429 and then succeeds; gives up after the third failure', async () => {
-    const calls: number[] = [];
-    const flaky = async () => {
-      calls.push(1);
-      return calls.length === 1
+  it('retries the main model once on a 429, then uses the fallback model; gives up if that fails too', async () => {
+    const models: string[] = [];
+    const flaky = (failFor: number) => async (_u: unknown, init: RequestInit) => {
+      models.push(JSON.parse(init.body as string).model);
+      return models.length <= failFor
         ? new Response('{}', { status: 429 })
         : new Response(JSON.stringify(answer(good)), { status: 200 });
     };
-    const ok = await createOpenRouterDocuments({
-      apiKey: 'k',
-      fetchImpl: flaky as never,
-      retryDelayMs: 0,
-    }).readBill(frames);
-    expect(ok).toEqual(good);
-    expect(calls).toHaveLength(2);
-    const always = vi.fn(async () => new Response('{}', { status: 429 }));
-    await expect(
+    const run2 = (f: unknown) =>
       createOpenRouterDocuments({
         apiKey: 'k',
-        fetchImpl: always as never,
+        model: 'main/m',
+        fallbackModel: 'back/up',
+        fetchImpl: f as never,
         retryDelayMs: 0,
-      }).readBill(frames),
-    ).rejects.toThrow(/429/);
-    expect(always).toHaveBeenCalledTimes(3);
+      }).readBill(frames);
+    expect(await run2(flaky(1))).toEqual(good);
+    expect(models).toEqual(['main/m', 'main/m']);
+    models.length = 0;
+    expect(await run2(flaky(2))).toEqual(good);
+    expect(models).toEqual(['main/m', 'main/m', 'back/up']); // main twice, then the fallback
+    models.length = 0;
+    await expect(run2(flaky(9))).rejects.toThrow(/429/);
+    expect(models).toEqual(['main/m', 'main/m', 'back/up']);
   });
-
   it('sends the picture as a data URL with structured output; key only in the header', async () => {
     const f = fake(answer(good));
     expect(await run(f)).toEqual(good);
