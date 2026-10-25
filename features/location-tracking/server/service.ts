@@ -163,10 +163,11 @@ export function createLocationService({
       return findState(user.patientId);
     },
 
-    /** Primary caregiver only: who looked at the location, and when. */
+    /** Primary caregiver only: who looked at the location, and when. `byYou` lets the UI leave out your own looks. */
     views(user: AuthUser, limit = 100) {
       if (user.role !== 'primary_caregiver' || !user.patientId) return { views: [] };
-      return { views: store.listAudit(user.patientId, limit) };
+      const rows = store.listAudit(user.patientId, limit);
+      return { views: rows.map((v) => ({ ...v, byYou: v.requesterId === user.id })) };
     },
   };
 }

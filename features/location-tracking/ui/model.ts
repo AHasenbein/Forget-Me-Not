@@ -6,6 +6,8 @@ export interface ViewRow {
   purpose: string;
   outcome: 'served' | 'no_data' | 'denied';
   at: string;
+  /** Set by the server: this look was the signed-in caregiver's own. */
+  byYou?: boolean;
 }
 
 /**
@@ -46,6 +48,59 @@ export function viewLabel(row: Pick<ViewRow, 'purpose' | 'outcome'>): string {
     default:
       return `${who} looked`;
   }
+}
+
+/** One line of the dashboard's "Worth knowing" box: something someone ELSE did, grouped. */
+export interface Notable {
+  key: string;
+  text: string;
+  count: number;
+  lastAt: string;
+  tone?: 'danger';
+}
+
+function notable(row: ViewRow): Omit<Notable, 'count' | 'lastAt'> | null {
+  // A blocked attempt always matters, whoever it was.
+  if (row.outcome === 'denied')
+    return {
+      key: 'denied',
+      text: 'Someone without permission tried to see the location (blocked)',
+      tone: 'danger',
+    };
+  if (row.byYou) return null;
+  switch (row.purpose) {
+    case 'circle_view':
+      return { key: 'circle', text: 'A family member looked at the location' };
+    case 'caregiver_view':
+      return { key: 'caregiver', text: 'Another caregiver looked at the location' };
+    case 'find_session':
+      return { key: 'find', text: 'Another caregiver started a find-them session' };
+    default:
+      return null; // automatic reads (lost-button alert, safe-zone check): in the full record only
+  }
+}
+
+/**
+ * What the caregiver should know about who looked, without the noise: your own looks and automatic reads are left
+ * out (they stay in the full record). Rows come newest first; repeats are grouped. Blocked attempts come first.
+ */
+export function worthKnowing(rows: readonly ViewRow[]): Notable[] {
+  const groups = new Map<string, Notable>();
+  for (const r of rows) {
+    const n = notable(r);
+    if (!n) continue;
+    const g = groups.get(n.key);
+    if (g) g.count++;
+    else groups.set(n.key, { ...n, count: 1, lastAt: r.at });
+  }
+  return [...groups.values()].sort(
+    (a, b) => Number(b.tone === 'danger') - Number(a.tone === 'danger'),
+  );
+}
+
+/** "A family member looked at the location (3 times). Last: Oct 24, 8:12 PM." */
+export function notableLine(n: Notable, fmt: (iso: string) => string): string {
+  return `${n.text}${n.count > 1 ? ` (${n.count} times)` : ''}. Last: ${fmt(n.lastAt)}.`;
 }
 
 /** "Oct 24, 8:12 PM" in the given zone (views can be days old, so the date matters). */

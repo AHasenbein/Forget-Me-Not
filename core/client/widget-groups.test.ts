@@ -69,7 +69,7 @@ describe('DASHBOARD_LAYOUT', () => {
     expect([...placed].sort()).toEqual(SECTIONS.map((s) => s.id).sort());
   });
 
-  it('puts the activity log under Today and the "needs you" box under Reminders', () => {
+  it('puts "Worth knowing" under Today and the "needs you" box under Reminders', () => {
     expect(rowsFor(3)).toEqual([
       ['today', 'manage', 'where'],
       ['activity', 'alerts', 'week'],

@@ -372,9 +372,11 @@ export function createReminderService({ store, bus, notifier, vision, now }: Rem
       return view(updated, at);
     },
 
+    /** `byYou` lets the dashboard show only what another caregiver did (the full record still lists everything). */
     async audit(user: AuthUser) {
       requireRole(user, 'primary_caregiver');
-      return store.listAudit(patientOf(user), 50);
+      const rows = await store.listAudit(patientOf(user), 50);
+      return rows.map((a) => ({ ...a, byYou: a.actorId === user.id }));
     },
 
     /** Job: delete photos past the retention window. Returns how many were removed. */

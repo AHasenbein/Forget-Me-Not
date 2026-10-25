@@ -34,7 +34,7 @@ export const SECTIONS: readonly { id: DashboardSection; label: string }[] = [
   { id: 'alerts', label: 'Needs you now' },
   { id: 'summary', label: 'Summary' },
   { id: 'today', label: 'Today' },
-  { id: 'activity', label: 'Activity' },
+  { id: 'activity', label: 'Worth knowing' },
   { id: 'manage', label: 'Reminders' },
   { id: 'where', label: 'Location' },
   { id: 'week', label: 'Week' },
@@ -52,7 +52,7 @@ export function bySection(widgets: Widget[]) {
 
 /**
  * Wide-screen dashboard, top to bottom: `top` spans the full width (the stats strip); then a grid of boxes, row by
- * row. Every box in a row is as tall as the tallest one, so the bottoms line up. The activity log sits under Today,
+ * row. Every box in a row is as tall as the tallest one, so the bottoms line up. "Worth knowing" sits under Today,
  * the "needs you" box (status + alerts) under Reminders. Every section appears exactly once (tested).
  */
 export const DASHBOARD_LAYOUT: {

@@ -28,7 +28,7 @@ provides it as the owned `location` port (`port.ts`, lazy; `core/providers/owned
 until it has a live store). Flag off = not registered.
 Contract access: demo = the seeded household (`readers`); live = the requester's own `profiles` row, read fresh on each
 call (`server/access.ts`: same patient, and primary caregiver / circle member with `view_location` / the patient;
-any lookup error denies). Contract reads are audited like route reads, so lost-button views show in "who looked".
+any lookup error denies). Contract reads are audited like route reads, so lost-button reads are in the full record (not in "Worth knowing").
 
 ## Data owned
 
@@ -92,8 +92,11 @@ readings, find sessions and audit rows (Settings > Demo controls > Reset), then 
   is audit-logged, so it is read only on "Show last location" / "Refresh". Shows "Last seen at <time> (within about N m)",
   never "now"; stale or missing location is shown in warning colour with "no update never means they are safe".
   "Open in Maps" is a user-initiated link (no third-party map tiles are fetched, so the area is not leaked).
-- "Who looked recently": last 5 rows of `GET /views` in plain words (Caregiver / Family member / Lost-button alert; blocked
-  attempts in red), folded behind "Show" (the count is in the heading). Never shows ids or coordinates.
+- "Worth knowing" box (`LocationWorthKnowing`, section `activity`): only what someone ELSE did, grouped with a count and last
+  time: a family member looked, another caregiver looked or started Find, and any blocked attempt (red, first). Your own looks
+  (`byYou` from `GET /views`) and automatic reads (lost-button, safe-zone) are left out, so an open lost alert polling every
+  30 s cannot drown a family member's look. "Full location record" shows the last 20 rows, your own marked "(you)". Never ids
+  or coordinates. Reading the list reads no location.
 - Patient widget (order 90, `PatientLocationSharing`): starts the tracker when the patient dashboard mounts (no shell change needed) and shows
   its real state (finding / working / turned off / cannot find). Web uses `tracker/web.ts` (`navigator.geolocation`, i.e. Google's
   location service in Chrome, foreground only, tab must stay open); phones use `tracker/expo.ts` (dev build, still unverified on a device).

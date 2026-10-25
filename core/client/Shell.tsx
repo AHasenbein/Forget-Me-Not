@@ -285,6 +285,20 @@ function StatusLine({ status }: { status: DashboardStatus }) {
   );
 }
 
+/**
+ * "Worth knowing" box (the `activity` section): not alerts, just what someone else did that you would want to hear
+ * about (a family member looked at the location, another caregiver opened pill photos). Each feature's full record
+ * is one tap away inside it, so every sensitive view stays visible to the caregiver without filling the page.
+ */
+function WorthKnowing({ children }: { children: ReactNode }) {
+  return (
+    <Card>
+      <AppText variant="title">Worth knowing</AppText>
+      {children}
+    </Card>
+  );
+}
+
 /** "Needs you" box: the status banner, then each open alert card (lost, payment, call, bill, missed reminder). */
 function NeedsYou({ status, children }: { status: DashboardStatus; children: ReactNode }) {
   return (
@@ -297,7 +311,7 @@ function NeedsYou({ status, children }: { status: DashboardStatus; children: Rea
 
 /**
  * Caregiver dashboard: the stats strip, then two rows of three boxes, each row's boxes the same height: Today, Reminders,
- * Location; then Activity log, the "needs you" box, This week (rows of two on narrower windows). The box's status banner says whether anything
+ * Location; then Worth knowing, the "needs you" box, This week (rows of two on narrower windows). The box's status banner says whether anything
  * needs you (widgets report through `useAttention`; it never says "all clear" while something is loading or failed),
  * with the open alert cards under it. It is an ordinary app UI (`standard` density: normal type and controls; Text size is for the
  * patient only). The page scrolls a little on small windows instead of shrinking.
@@ -346,12 +360,15 @@ function CaregiverPage() {
       </ScrollView>
     </DensityContext.Provider>
   );
-  // One section's tiles; `alerts` becomes the "needs you" box (always shown, so the status is never missing).
+  // One section's tiles; `alerts` becomes the "needs you" box (always shown, so the status is never missing) and
+  // `activity` the one "Worth knowing" box around its widgets.
   const section = (id: DashboardSection) =>
     id === 'alerts' ? (
       <NeedsYou key="needs-you" status={status}>
         {widgetsIn(['alerts']).map(slot)}
       </NeedsYou>
+    ) : id === 'activity' ? (
+      <WorthKnowing key="worth-knowing">{widgetsIn(['activity']).map(slot)}</WorthKnowing>
     ) : (
       widgetsIn([id]).map(slot)
     );

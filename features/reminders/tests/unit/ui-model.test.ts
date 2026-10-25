@@ -15,6 +15,7 @@ import {
   pickPatientFocus,
   pillCheckBadge,
   patientError,
+  photoWorthKnowing,
   type OccurrenceView,
 } from '../../ui/model';
 
@@ -229,5 +230,34 @@ describe('caregiver insights', () => {
   it('auditLabel falls back safely', () => {
     expect(auditLabel('pill_frames_viewed')).toMatch(/viewed/);
     expect(auditLabel('something_new')).toBe('Activity recorded');
+  });
+});
+
+describe('photoWorthKnowing (dashboard "Worth knowing" box)', () => {
+  it('only what ANOTHER caregiver did, grouped, newest time kept', () => {
+    const rows = [
+      { action: 'pill_frames_viewed', at: '2026-10-25T10:00:00Z', byYou: false },
+      { action: 'pill_frames_viewed', at: '2026-10-25T09:00:00Z', byYou: true },
+      { action: 'pill_frames_viewed', at: '2026-10-25T08:00:00Z', byYou: false },
+      { action: 'pill_check_reviewed', at: '2026-10-25T07:00:00Z', byYou: false },
+    ];
+    expect(photoWorthKnowing(rows)).toEqual([
+      {
+        action: 'pill_frames_viewed',
+        text: 'Another caregiver viewed pill photos',
+        count: 2,
+        lastAt: '2026-10-25T10:00:00Z',
+      },
+      {
+        action: 'pill_check_reviewed',
+        text: 'Another caregiver reviewed a pill photo check',
+        count: 1,
+        lastAt: '2026-10-25T07:00:00Z',
+      },
+    ]);
+  });
+
+  it('your own views are full-record only', () => {
+    expect(photoWorthKnowing([{ action: 'pill_frames_viewed', at: 'x', byYou: true }])).toEqual([]);
   });
 });

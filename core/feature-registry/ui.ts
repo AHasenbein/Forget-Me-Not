@@ -16,7 +16,10 @@ export interface Widget {
   Component: ComponentType<WidgetProps>;
 }
 
-/** Tiles of the caregiver dashboard (labels, order and layout: core/client/widget-groups.ts). */
+/**
+ * Tiles of the caregiver dashboard (labels, order and layout: core/client/widget-groups.ts). `alerts` and `activity`
+ * are boxes the shell draws ("Needs you", "Worth knowing"): `activity` widgets render plain lines, no Card of their own.
+ */
 export type DashboardSection =
   'summary' | 'alerts' | 'today' | 'manage' | 'week' | 'where' | 'activity';
 
