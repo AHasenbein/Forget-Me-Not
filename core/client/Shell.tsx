@@ -1,5 +1,5 @@
 import { Link, usePathname, useRouter } from 'expo-router';
-import { useState, type ReactNode } from 'react';
+import { useCallback, useEffect, useState, type ReactNode } from 'react';
 import { Pressable, Text, useWindowDimensions, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import {
@@ -19,7 +19,9 @@ import { usePoll } from './hooks';
 import { formatTime } from './format';
 import { SignIn } from './SignIn';
 import { PERSONAS, TEXT_SIZES, useSession } from './session';
+import { dashboardItems, WIDGET_GROUPS } from './widget-groups';
 import { widgetsFor } from './widgets';
+import type { Widget, WidgetGroup } from '../feature-registry/ui';
 
 export function TopBar({ hideBrand }: { hideBrand?: boolean } = {}) {
   const { demo, persona, setPersona, role } = useSession();
@@ -223,10 +225,53 @@ function Widgets() {
     );
   return (
     <>
-      {widgets.map((w) => (
-        <w.Component key={`${token}:${w.id}`} />
-      ))}
+      {dashboardItems(widgets).map((item) =>
+        item.kind === 'widget' ? (
+          <item.widget.Component key={`${token}:${item.widget.id}`} />
+        ) : (
+          <WidgetGroupView
+            key={`${token}:${item.group}`}
+            group={item.group}
+            members={item.members}
+          />
+        ),
+      )}
     </>
+  );
+}
+
+/** Idle time before an open group folds back to its one button. */
+const GROUP_IDLE_MS = 5000;
+
+/**
+ * One button ("Before I pay") that opens its members' own sub-buttons. It folds back by itself after 5 s with no touch or
+ * typing (no Back button for a confused user to hunt for). Members stay mounted so their state survives and a pending
+ * warning stays visible while the group is closed.
+ */
+function WidgetGroupView({ group, members }: { group: WidgetGroup; members: Widget[] }) {
+  const [open, setOpen] = useState(false);
+  const [beat, setBeat] = useState(0);
+  const touch = useCallback(() => setBeat((n) => n + 1), []);
+  useEffect(() => {
+    if (!open) return;
+    const t = setTimeout(() => setOpen(false), GROUP_IDLE_MS);
+    return () => clearTimeout(t);
+  }, [open, beat]);
+  return (
+    <View
+      style={{ width: '100%', maxWidth: 640, alignSelf: 'center', gap: 12 }}
+      onStartShouldSetResponderCapture={() => {
+        touch();
+        return false; // only listen; the tap still reaches the button
+      }}
+    >
+      {members.map((w) => (
+        <w.Component key={w.id} collapsed={!open} onActivity={touch} />
+      ))}
+      {open ? null : (
+        <BigButton tone="ghost" label={WIDGET_GROUPS[group]} onPress={() => setOpen(true)} />
+      )}
+    </View>
   );
 }
 

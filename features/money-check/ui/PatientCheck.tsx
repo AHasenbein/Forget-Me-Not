@@ -3,6 +3,7 @@ import { Pressable, View } from 'react-native';
 import { ApiError } from '@core/client/api';
 import { useSession } from '@core/client/session';
 import { AppText, BigButton, Card, Field, Icon } from '@core/design-system/components';
+import type { WidgetProps } from '@core/feature-registry/ui';
 import { palette } from '@core/design-system/tokens';
 import type { PatientStatus, Reason } from '../schemas';
 import {
@@ -22,10 +23,12 @@ interface Active {
 }
 
 /**
- * Patient: one calm, outlined button ("Before I pay"). It stays secondary so the screen keeps ONE primary action (the
+ * Patient: one calm, outlined button ("Enter payment description", inside the shared "Before I pay" group). While the group
+ * is collapsed only the status card shows, so a "don't pay yet" message is never hidden.
+ * It stays secondary so the screen keeps ONE primary action (the
  * reminder). A short box to type what the payment is for. The patient cannot approve anything: only the caregiver can.
  */
-export function PatientCheck() {
+export function PatientCheck({ collapsed = false, onActivity }: WidgetProps) {
   const { api, token } = useSession();
   const { data, reload } = useRequest(() => api<Active>('GET', `${BASE}/requests/active`), [token]);
   const [open, setOpen] = useState(false);
@@ -102,13 +105,16 @@ export function PatientCheck() {
             {why ? <AppText tone="muted">{why}</AppText> : null}
           </Card>
         </Pressable>
-      ) : open ? (
+      ) : collapsed ? null : open ? (
         <Card>
           <AppText variant="title">What is the payment for?</AppText>
           <Field
             label="Type it here"
             value={note}
-            onChangeText={(t) => setNote(t.slice(0, NOTE_MAX))}
+            onChangeText={(t) => {
+              onActivity?.();
+              setNote(t.slice(0, NOTE_MAX));
+            }}
             placeholder="For example: the water bill"
           />
           <AppText variant="small" tone="muted">
@@ -123,7 +129,7 @@ export function PatientCheck() {
           <BigButton tone="ghost" label="Never mind" onPress={() => setOpen(false)} />
         </Card>
       ) : (
-        <BigButton tone="ghost" label="Before I pay" onPress={() => setOpen(true)} />
+        <BigButton tone="ghost" label="Enter payment description" onPress={() => setOpen(true)} />
       )}
       {problem ? (
         <Card tone="danger">

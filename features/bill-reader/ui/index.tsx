@@ -5,7 +5,13 @@ import { PatientBill } from './PatientBill';
 export default defineFeatureUi({
   widgets: [
     // After "Before I pay" (20): outlined, so the patient's ONE primary action stays the reminder.
-    { id: 'bill-reader', role: 'patient', order: 25, Component: PatientBill },
+    {
+      id: 'bill-reader',
+      role: 'patient',
+      order: 25,
+      group: 'before-i-pay',
+      Component: PatientBill,
+    },
     // Near the top, and renders nothing until the patient has shown a bill.
     { id: 'bill-reader', role: 'primary_caregiver', order: 6, Component: CaregiverBills },
   ],

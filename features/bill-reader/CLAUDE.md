@@ -48,7 +48,7 @@ answer (shown to the caregiver as "Demo sample"), so the demo never shows "could
 
 ## UI (`ui/`, dashboard widgets)
 
-Patient (order 25, after "Before I pay"): outlined "Look at a bill" (the reminder keeps the one primary action) -> Take a picture (back
+Patient (order 25, in the shared "Before I pay" group): outlined "Scan bill" (the reminder keeps the one primary action) -> Take a picture (back
 camera, `expo-camera`) / Choose a picture (web file chooser, resized to <= 1600 px JPEG) / demo samples -> "Reading your bill..." -> result
 card with the table. Repeated taps are dropped. Native phones cannot pick from the gallery yet (needs `expo-image-picker` = new EAS build).
 Caregiver (order 6, renders nothing until a bill was shown): one line per scan, "Looks like a scam" / "Needs a look" badges, each warning

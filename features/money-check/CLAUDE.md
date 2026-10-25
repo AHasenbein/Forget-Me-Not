@@ -71,7 +71,7 @@ Run with `DATA_MODE=demo FEATURE_ALL=on`.
 
 ## UI (`ui/`, dashboard widgets)
 
-Patient widget (order 20): one outlined "Before I pay" button (the reminder keeps the one primary action), a "What is the payment for?" box with one
+Patient widget (order 20): one outlined "Enter payment description" button inside the shared "Before I pay" group (core widget group; the reminder keeps the one primary action), a "What is the payment for?" box with one
 "Check" button (typing under pressure is hard: a one-tap shortcut for "gift cards" could come back), then a status card (no cancel, no numbers). Caregiver widget (order 2, renders nothing until a request is open): verdict, reasons,
 bill, "Don't pay", and "It's OK to pay" (tap twice; armed state expires after 5 s). Logic is in `ui/model.ts`.
 
