@@ -69,6 +69,14 @@ export function CaregiverCheck() {
           </AppText>
         </View>
       </View>
+      {r.note ? (
+        <View style={{ gap: 2 }}>
+          <AppText variant="small" tone="muted">
+            They wrote:
+          </AppText>
+          <AppText>“{r.note}”</AppText>
+        </View>
+      ) : null}
       {bill ? (
         <AppText>
           {bill.payee}, {dollars(bill.amountCents)}

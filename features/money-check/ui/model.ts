@@ -1,10 +1,15 @@
-import type { Kind, Level, PatientStatus, Reason } from '../schemas';
+import {
+  NOTE_MAX,
+  NOTE_MIN,
+  type Kind,
+  type Level,
+  type PatientStatus,
+  type Reason,
+} from '../schemas';
 
-export const KIND_CHOICES: readonly { kind: Kind; label: string }[] = [
-  { kind: 'gift_card', label: 'Someone wants gift cards' },
-  { kind: 'caller_wants_money', label: 'A caller wants money' },
-  { kind: 'bill', label: 'I have a bill to pay' },
-];
+export { NOTE_MAX, NOTE_MIN };
+/** Enough to send? Trimmed length only; the server re-checks everything. */
+export const noteReady = (t: string) => t.trim().length >= NOTE_MIN;
 
 /** Caregiver-facing label for what the patient said. */
 export const kindLabel = (k: Kind): string =>
@@ -12,7 +17,9 @@ export const kindLabel = (k: Kind): string =>
     ? 'Someone asked for gift cards'
     : k === 'caller_wants_money'
       ? 'A caller wants money'
-      : 'A bill to pay';
+      : k === 'described'
+        ? 'A payment they described'
+        : 'A bill to pay';
 
 /** Plain words for the patient. Never an amount, a name or a code. */
 export function patientStatusText(status: PatientStatus): { title: string; body: string } {
@@ -39,6 +46,7 @@ export function patientReason(reasons: readonly Reason[]): string | null {
   if (reasons.includes('gift_card_payment')) return 'Real bills are never paid with gift cards.';
   if (reasons.includes('caller_pressure'))
     return 'Real offices never ask for money over the phone.';
+  if (reasons.includes('looks_like_scam')) return 'This sounds like something scammers do.';
   if (reasons.includes('large_amount')) return 'This one is bigger than usual, so we check twice.';
   if (reasons.includes('no_matching_bill')) return 'We could not find this bill.';
   return null;
@@ -57,6 +65,12 @@ export function caregiverReason(r: Reason): string {
       return 'The bill is larger than usual. Compare it with the paper bill.';
     case 'known_bill':
       return 'This matches an unpaid bill at the bank.';
+    case 'looks_like_scam':
+      return 'An automatic check thinks this could be a scam. It is only a hint: you decide.';
+    case 'unclear_purpose':
+      return 'It is not clear what this payment is for. Ask them, and compare with a paper bill.';
+    case 'ai_unsure':
+      return 'The automatic check was not sure, so please look at this one yourself.';
   }
 }
 
@@ -70,7 +84,9 @@ export const dollars = (cents: number) => `$${(cents / 100).toFixed(2)}`;
 export function patientError(code: string): string {
   return code === 'offline'
     ? 'I can’t reach the app right now. Please try again.'
-    : 'That didn’t work. Please try again.';
+    : code === 'too_many'
+      ? 'You have asked a lot today. Please call your caregiver.'
+      : 'That didn’t work. Please try again.';
 }
 
 export function caregiverError(code: string): string {

@@ -7,3 +7,6 @@ export const MAX_REQUESTS_PER_DAY = 6;
 export const DAY_MS = 24 * 60 * MIN;
 /** How long the patient keeps seeing the last answer after it is given, so they are never left guessing. */
 export const OUTCOME_MS = 10 * MIN;
+
+/** A model that has not answered by now is ignored: the rules verdict stands (the patient is waiting). */
+export const AI_TIMEOUT_MS = 8_000;

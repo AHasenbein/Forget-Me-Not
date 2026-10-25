@@ -1,11 +1,28 @@
 import type { AuthUser } from '@core/auth/types';
 import type { EventBus } from '@core/events/bus';
 import type { Notifier } from '@core/notifications';
+import type { AiClient } from '@core/ai/client';
 import type { PlaidPort } from '@core/providers/types';
 import { HttpError } from '@core/server/errors';
-import { DAY_MS, MAX_REQUESTS_PER_DAY, OUTCOME_MS, REQUEST_TTL_MS } from './constants';
-import { assess } from './rules';
+import {
+  AI_TIMEOUT_MS,
+  DAY_MS,
+  MAX_REQUESTS_PER_DAY,
+  OUTCOME_MS,
+  REQUEST_TTL_MS,
+} from './constants';
+import {
+  AI_TASK,
+  aiPrompt,
+  assess,
+  assessNote,
+  mergeAi,
+  parseAiVerdict,
+  redactNote,
+} from './rules';
 import type { Kind, MoneyRequest, PatientStatus } from './schemas';
+
+export type CreateInput = { kind: Exclude<Kind, 'described'> } | { note: string };
 import type { RequestStore } from './store';
 
 export interface MoneyCheckDeps {
@@ -13,6 +30,8 @@ export interface MoneyCheckDeps {
   bus: EventBus;
   notifier: () => Notifier; // lazy: resolved only when a push is actually sent
   plaid: () => PlaidPort;
+  /** Lazy and optional: no live text model yet, so a throw or a missing one simply means "rules only". */
+  ai?: () => AiClient;
   /** Current primary caregiver(s) of a patient, looked up on every push so an unlinked caregiver stops receiving. */
   caregiversOf: (patientId: string) => string[];
   now: () => Date;
@@ -26,6 +45,7 @@ export function createMoneyCheckService({
   bus,
   notifier,
   plaid,
+  ai,
   caregiversOf,
   now,
 }: MoneyCheckDeps) {
@@ -87,9 +107,28 @@ export function createMoneyCheckService({
     since: r.createdAt,
   });
 
+  /** A model's second opinion on a typed note. null on ANY problem (no model, error, timeout, bad JSON): rules still decide. */
+  const askAi = async (note: string) => {
+    if (!ai) return null;
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    try {
+      const reply = await Promise.race([
+        ai().complete({ task: AI_TASK, content: aiPrompt(note) }),
+        new Promise<never>((_, reject) => {
+          timer = setTimeout(() => reject(new Error('timeout')), AI_TIMEOUT_MS);
+        }),
+      ]);
+      return parseAiVerdict(reply.text, reply.confidence);
+    } catch {
+      return null;
+    } finally {
+      clearTimeout(timer);
+    }
+  };
+
   return {
     /** The patient asks "may I pay this?". Idempotent while a request is open (repeated taps, same request, no second push). */
-    async create(user: AuthUser, input: { kind: Kind }) {
+    async create(user: AuthUser, input: CreateInput) {
       requireRole(user, 'patient');
       const patientId = patientOf(user);
       const open = store.getOpen(patientId);
@@ -102,26 +141,33 @@ export function createMoneyCheckService({
       if (store.countSince(patientId, since) >= MAX_REQUESTS_PER_DAY)
         throw new HttpError(429, 'too_many');
 
+      const note = 'note' in input ? redactNote(input.note) : null;
+      const tapKind = 'kind' in input ? input.kind : null;
+      const needBills = note !== null || tapKind === 'bill';
       let bills: Awaited<ReturnType<PlaidPort['listTransactions']>> = [];
-      if (input.kind === 'bill') {
+      if (needBills) {
         try {
           bills = await plaid().listTransactions(patientId);
         } catch {
           // bank unavailable: no matching bill => "check", never "ok"
         }
       }
-      // A concurrent tap may have created the request while we awaited the bank.
+      // Rules are the floor. For typed text a model may add a second opinion, but it can only raise the level.
+      let verdict =
+        note !== null ? assessNote(note, bills) : { ...assess(tapKind!, bills), kind: tapKind! };
+      if (note !== null) verdict = { ...verdict, ...mergeAi(verdict, await askAi(note)) };
+      // A concurrent tap may have created the request while we awaited the bank / model.
       const raced = store.getOpen(patientId);
       if (raced) return { request: patientView(raced), alreadyOpen: true };
 
-      const verdict = assess(input.kind, bills);
       const r: MoneyRequest = {
         id: crypto.randomUUID(),
         patientId,
-        kind: input.kind,
+        kind: verdict.kind,
         level: verdict.level,
         reasons: verdict.reasons,
         billId: verdict.bill?.id ?? null,
+        note,
         createdAt: now().toISOString(),
         expiresAt: new Date(now().getTime() + REQUEST_TTL_MS).toISOString(),
         status: 'pending',

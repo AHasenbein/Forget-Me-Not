@@ -1,7 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { REASONS } from '../../schemas';
 import {
-  KIND_CHOICES,
   caregiverError,
   caregiverReason,
   dollars,
@@ -29,7 +28,6 @@ describe('patient wording', () => {
       ...REASONS.map((r) => patientReason([r]) ?? ''),
       patientError('offline'),
       patientError('x'),
-      ...KIND_CHOICES.map((c) => c.label),
     ].join(' ');
     expect(all).not.toMatch(/\d|\$|error|code|http/i);
   });

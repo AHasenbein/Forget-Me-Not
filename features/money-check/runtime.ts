@@ -3,6 +3,7 @@ import { isDemo } from '@core/config/data-mode';
 import { eventBus, type EventBus } from '@core/events/bus';
 import type { Notifier } from '@core/notifications';
 import { getProviders } from '@core/providers';
+import type { AiClient } from '@core/ai/client';
 import type { PlaidPort } from '@core/providers/types';
 import { getBus } from './bus-ref';
 import { createMoneyCheckService, type MoneyCheckService } from './service';
@@ -12,6 +13,7 @@ import { MemoryRequestStore } from './store';
 export interface Overrides {
   notifier?: Notifier;
   plaid?: PlaidPort;
+  ai?: AiClient;
   now?: () => Date;
 }
 
@@ -44,6 +46,7 @@ export function getService(): MoneyCheckService {
       bus,
       notifier: () => overrides.notifier ?? (providers ??= getProviders()).notifier,
       plaid: () => overrides.plaid ?? (providers ??= getProviders()).plaid,
+      ai: () => overrides.ai ?? (providers ??= getProviders()).ai,
       caregiversOf: (patientId) => {
         assertDemo('caregiver lookup');
         return caregivers.get(patientId) ?? [];
