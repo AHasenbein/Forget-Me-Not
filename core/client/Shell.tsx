@@ -1,7 +1,3 @@
-import { useFonts } from 'expo-font';
-import fraunces from '../design-system/fonts/Fraunces_700Bold.ttf';
-import atkinson400 from '../design-system/fonts/AtkinsonHyperlegible_400Regular.ttf';
-import atkinson700 from '../design-system/fonts/AtkinsonHyperlegible_700Bold.ttf';
 import { Link, usePathname, useRouter } from 'expo-router';
 import { useState, type ReactNode } from 'react';
 import { Pressable, Text, useWindowDimensions, View } from 'react-native';
@@ -47,10 +43,7 @@ export function TopBar({ hideBrand }: { hideBrand?: boolean } = {}) {
           <View style={{ flex: 1, flexDirection: 'row', alignItems: 'center', gap: 10 }}>
             <Icon name="flower" size={36} />
             {!patient && !hideBrand ? (
-              <Text
-                numberOfLines={1}
-                style={{ fontSize: 18, fontFamily: font.bold, color: palette.text }}
-              >
+              <Text numberOfLines={1} style={{ fontSize: 18, ...font.bold, color: palette.text }}>
                 Forget Me Not
               </Text>
             ) : null}
@@ -77,7 +70,7 @@ export function TopBar({ hideBrand }: { hideBrand?: boolean } = {}) {
               >
                 <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
                   <Icon name={onSettings ? 'back' : 'sliders'} size={26} />
-                  <Text style={{ fontSize: 24, fontFamily: font.bold, color: palette.text }}>
+                  <Text style={{ fontSize: 24, ...font.bold, color: palette.text }}>
                     {onSettings ? 'Back' : 'Settings'}
                   </Text>
                 </View>
@@ -143,7 +136,7 @@ export function BottomNav() {
                 <Text
                   style={{
                     fontSize: 16,
-                    fontFamily: font.bold,
+                    ...font.bold,
                     color: on ? palette.primary : palette.muted,
                   }}
                 >
@@ -173,9 +166,7 @@ function Sidebar() {
     >
       <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10, marginBottom: 24 }}>
         <Icon name="flower" size={40} />
-        <Text style={{ fontSize: 20, fontFamily: font.bold, color: '#FFFFFF', flex: 1 }}>
-          Forget Me Not
-        </Text>
+        <Text style={{ fontSize: 20, ...font.bold, color: '#FFFFFF', flex: 1 }}>Forget Me Not</Text>
       </View>
       {NAV.map((n) => {
         const on = n.href === '/' ? path === '/' : path.startsWith(n.href);
@@ -195,9 +186,7 @@ function Sidebar() {
               }}
             >
               <Icon name={n.icon} size={26} color="#FFFFFF" />
-              <Text style={{ fontSize: 20, fontFamily: font.bold, color: '#FFFFFF' }}>
-                {n.label}
-              </Text>
+              <Text style={{ fontSize: 20, ...font.bold, color: '#FFFFFF' }}>{n.label}</Text>
             </Pressable>
           </Link>
         );
@@ -209,15 +198,8 @@ function Sidebar() {
 /** Root frame: optional sidebar on wide screens, then top bar, page and (narrow) bottom bar. */
 export function AppFrame({ children }: { children: ReactNode }) {
   const { role, liveStatus } = useSession();
-  const [fontsReady, fontError] = useFonts({
-    Fraunces_700Bold: fraunces,
-    AtkinsonHyperlegible_400Regular: atkinson400,
-    AtkinsonHyperlegible_700Bold: atkinson700,
-  });
   const wide = useWindowDimensions().width >= 900;
   const side = wide && role === 'primary_caregiver' && liveStatus === 'ready';
-  // Wait for the fonts (a moment); if they fail to load, carry on with the system font rather than a blank app.
-  if (!fontsReady && !fontError) return <View style={{ flex: 1, backgroundColor: palette.bg }} />;
   return (
     <View style={{ flex: 1, flexDirection: 'row', backgroundColor: palette.bg }}>
       {side ? <Sidebar /> : null}

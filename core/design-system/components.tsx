@@ -17,7 +17,7 @@ import { font, palette, patientUi, radius, type IconName, type Tone } from './to
 import { useTextScale } from './text-scale';
 
 type Variant = 'huge' | 'title' | 'body' | 'small';
-const SIZE: Record<Variant, number> = { huge: 42, title: 28, body: 24, small: 18 };
+const SIZE: Record<Variant, number> = { huge: 40, title: 30, body: 24, small: 18 };
 
 export function AppText({
   variant = 'body',
@@ -44,7 +44,7 @@ export function AppText({
             ? palette[tone]
             : palette.text;
   const display = variant === 'huge' || variant === 'title';
-  // Headlines stop growing at 1.25x: at 1.5x a 42px title swallows a phone screen.
+  // Headlines stop growing at 1.25x: at 1.5x a 40px title swallows a phone screen.
   const size = SIZE[variant] * (display ? Math.min(scale, 1.25) : scale);
   return (
     <Text
@@ -52,7 +52,7 @@ export function AppText({
         fontSize: size,
         lineHeight: Math.round(size * (display ? 1.15 : 1.35)),
         color,
-        fontFamily: display ? font.display : bold ? font.bold : font.body,
+        ...(display ? font.display : bold ? font.bold : font.body),
         textAlign: center ? 'center' : 'left',
       }}
     >
@@ -117,7 +117,7 @@ export function Badge({ label, tone = 'neutral' }: { label: string; tone?: Tone 
   return (
     <View style={s.badge}>
       <View style={[s.dot, { backgroundColor: color }]} />
-      <Text style={{ color, fontFamily: font.bold, fontSize: 16 }}>{label}</Text>
+      <Text style={{ color, ...font.bold, fontSize: 16 }}>{label}</Text>
     </View>
   );
 }
@@ -170,7 +170,7 @@ export function BigButton({
       <Text
         style={{
           fontSize: (size === 'huge' ? 38 : patientUi.minFontSize) * scale,
-          fontFamily: font.bold,
+          ...font.bold,
           color: solid ? palette.onPrimary : base,
           textAlign: 'center',
         }}
@@ -207,7 +207,7 @@ export function Chip({
       <Text
         style={{
           color: selected ? palette.onPrimary : palette.primary,
-          fontFamily: font.bold,
+          ...font.bold,
           fontSize: 18,
         }}
       >
@@ -321,7 +321,7 @@ export function Segmented<T extends string>({
             <Text
               style={{
                 fontSize: 18,
-                fontFamily: font.bold,
+                ...font.bold,
                 color: on ? palette.primary : palette.muted,
               }}
             >
@@ -399,7 +399,7 @@ export function Ledger({
         >
           <Text
             style={{
-              fontFamily: font.display,
+              ...font.display,
               fontSize: 40 * Math.min(scale, 1.25),
               color: inverse
                 ? it.tone === 'danger'
@@ -414,7 +414,7 @@ export function Ledger({
           </Text>
           <Text
             style={{
-              fontFamily: font.body,
+              ...font.body,
               fontSize: 16 * scale,
               color: inverse ? '#D4E8DF' : palette.muted,
             }}
@@ -475,7 +475,7 @@ const s = StyleSheet.create({
     paddingHorizontal: 14,
     minHeight: 60,
     fontSize: 22,
-    fontFamily: font.body,
+    ...font.body,
     backgroundColor: palette.card,
     color: palette.text,
   },
