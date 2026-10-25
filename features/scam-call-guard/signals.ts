@@ -39,6 +39,8 @@ const RULES: Record<Signal, RegExp[]> = {
     /\bmother'?s maiden name\b/,
     /\b(password|passcode|pin number|(one[- ]time|verification) (code|password))\b/,
   ],
+  // Any mention at all: real Social Security staff almost never cold-call, and it is the most common impersonation.
+  social_security: [/\bsocial[\s-]?security\b/, /\bssn\b/, /\bs\.? ?s\.? ?a\.?(?=\s|$)/],
   verify_details: [
     /\b(verify|confirm|update)\b[^.?!]{0,30}\b(account|identity|date of birth|address|card|information|details)\b/,
     /\bfor (security|verification) (purposes|reasons)\b/,
@@ -131,6 +133,7 @@ const WEIGHT: Record<Signal, number> = {
   crypto: 3,
   remote_access: 3,
   personal_info: 3,
+  social_security: 5, // DANGER_SCORE on its own: flagged the moment it is said
   rate_offer: 3,
   advance_fee: 3,
   safe_account: 3,

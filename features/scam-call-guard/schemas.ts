@@ -21,6 +21,7 @@ export type Signal =
   | 'crypto'
   | 'read_numbers'
   | 'personal_info'
+  | 'social_security'
   | 'verify_details'
   | 'authority'
   | 'threat'

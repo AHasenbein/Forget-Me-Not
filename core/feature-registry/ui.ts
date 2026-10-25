@@ -35,6 +35,11 @@ export interface WidgetProps {
   collapsed?: boolean;
   /** Call on typing so the group does not fold away mid-sentence. */
   onActivity?: () => void;
+  /**
+   * `true` while the patient is in the middle of something here (a form, a camera, a result to read): the group stays open
+   * however long it takes. `false` when done; the group then folds back after its usual idle time.
+   */
+  onHold?: (holding: boolean) => void;
 }
 
 /**

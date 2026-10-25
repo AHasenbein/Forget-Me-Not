@@ -21,6 +21,7 @@ const SIGNAL_WORDS: Record<string, string> = {
   crypto: 'asked for crypto',
   read_numbers: 'asked to read out numbers',
   personal_info: 'asked for private details (like a Social Security or card number)',
+  social_security: 'mentioned Social Security',
   verify_details: 'asked to "verify" account details',
   authority: 'claimed to be an official or from a bank',
   threat: 'made threats (arrest, shut-off, legal action)',
