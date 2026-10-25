@@ -2,7 +2,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useEffect, useState } from 'react';
 import { Modal, ScrollView, View } from 'react-native';
 import { useSession } from '@core/client/session';
-import { AppText, BigButton, Card, Icon, ProgressDots } from '@core/design-system/components';
+import { AppText, BigButton, Card, ProgressDots } from '@core/design-system/components';
 import { palette } from '@core/design-system/tokens';
 import { buildPages, clampPage, dateLine, readProgress, type Page, type Paper } from './model';
 
@@ -79,10 +79,7 @@ export function PatientPaper() {
     <>
       <View style={COLUMN}>
         <Card>
-          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
-            <Icon name="flower" size={32} />
-            <AppText variant="title">Today’s paper</AppText>
-          </View>
+          <AppText variant="title">Today’s paper</AppText>
           <BigButton
             tone="ghost"
             label={page > 0 ? 'Keep reading' : 'Read today’s paper'}
