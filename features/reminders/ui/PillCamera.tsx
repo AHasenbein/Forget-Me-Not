@@ -85,7 +85,7 @@ export function PillCamera({
       <AppText variant="title" center>
         Show your pill, then a sip of water
       </AppText>
-      <View style={{ borderRadius: 20, overflow: 'hidden' }}>
+      <View style={{ borderRadius: 8, overflow: 'hidden' }}>
         <CameraView ref={cam} facing="front" style={{ height: 320, width: '100%' }} />
       </View>
       {failed ? <AppText center>That didn’t work. You can try again, or skip.</AppText> : null}
