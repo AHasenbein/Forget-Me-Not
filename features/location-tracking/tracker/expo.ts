@@ -57,13 +57,35 @@ export function createDeviceTracker(http: HttpUploaderDeps): Tracker {
   return tracker;
 }
 
-export async function startTracking(tracker: Tracker): Promise<PermissionLevel> {
+export interface TrackingSession {
+  level: PermissionLevel;
+  /** Ends the foreground watcher. The background task (if any) keeps running: use `stopTracking` for that. */
+  stop: () => void;
+}
+
+export async function startTracking(tracker: Tracker): Promise<TrackingSession> {
   const level = await ensurePermissions();
-  if (level === 'denied') return level;
-  // One immediate reading so the caregiver sees something right away.
-  const first = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.Balanced });
-  await tracker.onFix(toFix(first));
-  if (level === 'always' && !(await Location.hasStartedLocationUpdatesAsync(TASK_NAME))) {
+  if (level === 'denied') return { level, stop: () => undefined };
+  // One immediate reading so the caregiver sees something right away. GPS off or a timeout must not stop the rest.
+  try {
+    const first = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.Balanced });
+    await tracker.onFix(toFix(first));
+  } catch {
+    // no fix yet: the watcher or the background task delivers the next one
+  }
+  if (level === 'when_in_use') {
+    // No background permission: report while the app is open (the tracker throttles to one per interval).
+    const sub = await Location.watchPositionAsync(
+      {
+        accuracy: Location.Accuracy.Balanced,
+        timeInterval: REPORT_INTERVAL_MS,
+        distanceInterval: 0,
+      },
+      (l) => void tracker.onFix(toFix(l)),
+    );
+    return { level, stop: () => sub.remove() };
+  }
+  if (!(await Location.hasStartedLocationUpdatesAsync(TASK_NAME))) {
     await Location.startLocationUpdatesAsync(TASK_NAME, {
       accuracy: Location.Accuracy.Balanced,
       timeInterval: REPORT_INTERVAL_MS, // Android only; tracker.ts enforces the cadence on iOS
@@ -76,7 +98,7 @@ export async function startTracking(tracker: Tracker): Promise<PermissionLevel> 
       },
     });
   }
-  return level;
+  return { level, stop: () => undefined };
 }
 
 export async function stopTracking(): Promise<void> {

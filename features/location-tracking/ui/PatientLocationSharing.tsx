@@ -5,6 +5,8 @@ import { usePoll } from '@core/client/hooks';
 import { useSession } from '@core/client/session';
 import { AppText, BigButton, Card, Icon } from '@core/design-system/components';
 import { palette } from '@core/design-system/tokens';
+import { FIND_REPORT_INTERVAL_MS, REPORT_INTERVAL_MS } from '../constants';
+import type { Tracker } from '../tracker/tracker';
 import { sharingLine, type SharingState } from './model';
 
 /**
@@ -28,6 +30,19 @@ export function PatientLocationSharing() {
   }, [finding]);
   const precise = finding && !stopped;
 
+  // Web: ask the browser again on the report cadence; its watcher stays quiet while the patient sits still.
+  const webTracker = useRef<Tracker | null>(null);
+  usePoll(
+    async () => {
+      if (Platform.OS !== 'web' || !webTracker.current) return null;
+      const web = await import('../tracker/web');
+      await web.refreshWebPosition(webTracker.current, precise);
+      return null;
+    },
+    precise ? FIND_REPORT_INTERVAL_MS : REPORT_INTERVAL_MS / 2,
+    [precise],
+  );
+
   useEffect(() => {
     let stop = () => undefined as void | Promise<void>;
     let alive = true;
@@ -36,13 +51,17 @@ export function PatientLocationSharing() {
       try {
         if (Platform.OS === 'web') {
           const web = await import('../tracker/web');
+          if (!alive) return; // unmounted or mode changed while loading: never leave a second watcher running
           const tracker = precise ? web.createFastWebTracker(http) : web.createWebTracker(http);
+          webTracker.current = tracker;
           stop = web.startWebTracking(tracker, (r) => alive && setState(r), precise);
         } else {
           const dev = await import('../tracker/expo');
           const tracker = dev.createDeviceTracker(http);
-          const level = await dev.startTracking(tracker);
-          if (alive) setState(level === 'denied' ? 'denied' : 'started');
+          const session = await dev.startTracking(tracker);
+          if (!alive) return session.stop();
+          stop = session.stop;
+          setState(session.level === 'denied' ? 'denied' : 'started');
         }
       } catch {
         if (alive) setState('unavailable');
@@ -51,6 +70,7 @@ export function PatientLocationSharing() {
     void run();
     return () => {
       alive = false;
+      webTracker.current = null;
       void stop();
     };
   }, [precise]);

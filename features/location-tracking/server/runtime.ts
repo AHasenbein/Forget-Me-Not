@@ -22,6 +22,8 @@ function build(now: () => Date): Runtime {
   return { store, service, readers };
 }
 
+// Real time on purpose (not @core/clock): device readings carry real device time, so staleness and find-session
+// expiry must use the same base. On the sped-up demo clock a fresh reading looked old and Find ended in seconds.
 let runtime = build(() => new Date());
 
 export const getRuntime = () => runtime;

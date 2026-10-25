@@ -53,6 +53,8 @@ export default defineFeature({
   nav: [],
   permissions: ['view_location'],
   events: { emits: [], consumes: [] },
+  // Demo "Reset": forget device readings, find sessions and audit rows, then demoSeed runs again.
+  demoReset: async () => void (await import('./server/runtime')).resetRuntime(),
   demoSeed: async ({ world }) => (await import('./demo/seed')).seedLocation(world),
   migrations: ['location-tracking__202610241800_init.sql'],
 });
