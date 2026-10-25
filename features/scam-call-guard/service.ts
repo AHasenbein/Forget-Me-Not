@@ -9,6 +9,7 @@ import {
   AI_DANGER_CONFIDENCE,
   AI_TIMEOUT_MS,
   ANALYZE_EVERY_CHARS,
+  ANALYZE_FIRST_CHARS,
   IDLE_END_MS,
   MAX_CALL_CHARS,
   MAX_CALL_MS,
@@ -205,7 +206,7 @@ export function createScamCallGuardService(deps: ScamCallGuardDeps) {
       return { call: patientView(c), alreadyActive: false };
     },
 
-    /** Real-time path: rules run on every segment; the AI runs every ANALYZE_EVERY_CHARS. The response carries the warning. */
+    /** Real-time path: rules run on every segment; the AI runs early (ANALYZE_FIRST_CHARS), then every ANALYZE_EVERY_CHARS. The response carries the warning. */
     async addSegment(user: AuthUser, id: string, seg: { seq: number; text: string }) {
       requireRole(user, 'patient');
       const c = ownCall(user, id);
@@ -226,7 +227,10 @@ export function createScamCallGuardService(deps: ScamCallGuardDeps) {
       c.level = maxLevel(c.level, levelFor(c.signals));
       store.put(c);
 
-      if (c.charsSinceAnalysis >= ANALYZE_EVERY_CHARS) await analyse(c);
+      if (
+        c.charsSinceAnalysis >= (c.aiVerdict === null ? ANALYZE_FIRST_CHARS : ANALYZE_EVERY_CHARS)
+      )
+        await analyse(c);
       await escalate(c);
       return { call: patientView(c), duplicate: false };
     },

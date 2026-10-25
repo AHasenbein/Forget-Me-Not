@@ -62,7 +62,14 @@ export default defineFeature({
       handler: lazy('views'),
     },
   ],
-  nav: [], // added with the UI
+  nav: [], // widgets live in ui/index.tsx
+  jobs: [
+    {
+      name: 'scam-call-guard-sweep',
+      everyMs: 60_000,
+      run: async () => void (await (await import('./runtime')).getService().sweep()),
+    },
+  ],
   permissions: ['scam_call_guard.listen', 'scam_call_guard.review'],
   events: { emits: ['caregiver.alert'], consumes: [] },
   migrations: ['scam-call-guard__202610241930_init.sql'],

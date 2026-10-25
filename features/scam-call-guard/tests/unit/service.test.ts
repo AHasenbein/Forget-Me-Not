@@ -230,6 +230,17 @@ describe('scam-call-guard service', () => {
     });
   });
 
+  it('asks the AI early in a call (about 120 characters), then waits for more speech', async () => {
+    const t = setup();
+    const { call } = await t.svc.start(patient);
+    await t.svc.addSegment(patient, call.id, { seq: 0, text: 'a'.repeat(60) });
+    expect(t.ai.calls).toHaveLength(0);
+    await t.svc.addSegment(patient, call.id, { seq: 1, text: 'b'.repeat(80) });
+    expect(t.ai.calls).toHaveLength(1);
+    await t.svc.addSegment(patient, call.id, { seq: 2, text: 'c'.repeat(200) });
+    expect(t.ai.calls).toHaveLength(1); // not again until ~400 more characters
+  });
+
   it('caregiver can mark a false alarm; patient and other patients cannot see it', async () => {
     const t = setup();
     const { call } = await t.svc.start(patient);

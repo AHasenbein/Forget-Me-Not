@@ -1,5 +1,7 @@
 const MIN = 60_000;
 
+/** The first AI check comes early (a scam is best caught in the opening lines); later checks wait for more speech. */
+export const ANALYZE_FIRST_CHARS = 120;
 /** New transcript characters needed before the AI is asked again (rules run on every segment; the AI is the slow, costly part). */
 export const ANALYZE_EVERY_CHARS = 400;
 /** The AI must answer inside this window or the segment response goes out on the rules alone. */

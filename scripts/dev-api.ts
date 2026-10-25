@@ -2,6 +2,7 @@ import { serve } from '@hono/node-server';
 import { Hono } from 'hono';
 import { cors } from 'hono/cors';
 import Anthropic from '@anthropic-ai/sdk';
+import { createOpenRouterText } from '../core/ai/openrouter-text';
 import { createClaudeVision } from '../core/ai/claude-vision';
 import { createClient } from '@supabase/supabase-js';
 import { createQuickLogin } from '../core/auth/quick-login';
@@ -25,6 +26,18 @@ if (!isDemo()) registerLive('verifier', createVerifier(supabaseAuthPorts(service
 if (dataMode('vision') === 'live') {
   if (!process.env.AI_API_KEY) throw new Error('DATA_MODE_VISION=live needs AI_API_KEY in .env');
   registerLive('vision', createClaudeVision(new Anthropic({ apiKey: process.env.AI_API_KEY })));
+}
+// Real call analysis (and any other text AI task) only when asked for (DATA_MODE_AI=live) AND a key exists.
+if (dataMode('ai') === 'live') {
+  if (!process.env.OPENROUTER_API_KEY)
+    throw new Error('DATA_MODE_AI=live needs OPENROUTER_API_KEY in .env');
+  registerLive(
+    'ai',
+    createOpenRouterText({
+      apiKey: process.env.OPENROUTER_API_KEY,
+      model: process.env.OPENROUTER_MODEL || undefined,
+    }),
+  );
 }
 const { verifier } = getProviders({ world });
 
