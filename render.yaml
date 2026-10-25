@@ -26,7 +26,6 @@ services:
   - type: web
     name: fmn-web
     runtime: static
-    plan: free
     autoDeployTrigger: checksPass
     buildCommand: npm ci --include=dev && npm run build
     staticPublishPath: dist
