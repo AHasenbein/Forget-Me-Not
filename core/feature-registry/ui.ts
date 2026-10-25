@@ -16,9 +16,13 @@ export interface Widget {
   Component: ComponentType<WidgetProps>;
 }
 
-/** Tiles of the caregiver dashboard (labels, order and layout: core/client/widget-groups.ts). */
+/**
+ * Tiles of the caregiver dashboard (labels, order and layout: core/client/widget-groups.ts). `alerts` and `activity`
+ * are drawn by the shell: one "Needs you" box with "Worth knowing" (`activity`) at its foot; `activity` widgets render
+ * plain lines, no Card of their own.
+ */
 export type DashboardSection =
-  'summary' | 'alerts' | 'today' | 'manage' | 'week' | 'where' | 'activity';
+  'summary' | 'alerts' | 'today' | 'manage' | 'messages' | 'week' | 'where' | 'activity';
 
 /** Groups let features share one button without importing each other (e.g. money-check + bill-reader behind "Before I pay"). */
 export type WidgetGroup = 'before-i-pay';

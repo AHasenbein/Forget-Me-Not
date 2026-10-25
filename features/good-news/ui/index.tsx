@@ -10,7 +10,7 @@ export default defineFeatureUi({
       id: 'paper-message',
       role: 'primary_caregiver',
       order: 15,
-      section: 'manage', // writing the morning note sits with the other things the caregiver sets up
+      section: 'messages', // its own box in the caregiver grid (two even rows of three)
       Component: CaregiverPaperMessage,
     },
   ],

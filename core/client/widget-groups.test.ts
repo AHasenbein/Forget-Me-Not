@@ -7,6 +7,7 @@ import {
   dashboardStatus,
   rowsFor,
   SECTIONS,
+  type GridCell,
 } from './widget-groups';
 
 const w = (
@@ -64,24 +65,41 @@ describe('bySection', () => {
 });
 
 describe('DASHBOARD_LAYOUT', () => {
-  it('places every section exactly once', () => {
-    const placed = [...DASHBOARD_LAYOUT.top, ...rowsFor(3).flat()];
+  const ids = (rows: GridCell[][]) => rows.map((r) => r.map((c) => c.id));
+
+  it('places every section exactly once ("Worth knowing" inside the "needs you" box)', () => {
+    const placed = [
+      ...DASHBOARD_LAYOUT.top,
+      ...rowsFor(3)
+        .flat()
+        .flatMap((c) => [c.id, ...(c.with ?? [])]),
+    ];
     expect([...placed].sort()).toEqual(SECTIONS.map((s) => s.id).sort());
   });
 
-  it('puts the activity log under Today and the "needs you" box under Reminders', () => {
-    expect(rowsFor(3)).toEqual([
+  it('3 columns: two rows of three, "Worth knowing" inside the "needs you" box', () => {
+    expect(ids(rowsFor(3))).toEqual([
       ['today', 'manage', 'where'],
-      ['activity', 'alerts', 'week'],
+      ['alerts', 'messages', 'week'],
     ]);
+    expect(rowsFor(3)[1]?.[0]).toMatchObject({ id: 'alerts', with: ['activity'] });
   });
 
-  it('re-cuts the same boxes into narrower rows, keeping order and every section', () => {
-    expect(rowsFor(2)).toEqual([
+  it('every row is full at any width (a later narrow box fills a gap, order otherwise kept)', () => {
+    expect(ids(rowsFor(2))).toEqual([
       ['today', 'manage'],
-      ['where', 'activity'],
-      ['alerts', 'week'],
+      ['where', 'alerts'],
+      ['messages', 'week'],
     ]);
+    for (const n of [1, 2, 3, 4, 5]) {
+      const rows = rowsFor(n);
+      const full = Math.min(
+        n,
+        DASHBOARD_LAYOUT.cells.reduce((t, c) => t + Math.min(c.span, n), 0),
+      );
+      for (const r of rows.slice(0, -1)) expect(r.reduce((t, c) => t + c.span, 0)).toBe(full);
+      expect(rows.flat()).toHaveLength(DASHBOARD_LAYOUT.cells.length);
+    }
     expect(rowsFor(1)).toHaveLength(6);
   });
 });

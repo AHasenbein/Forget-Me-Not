@@ -26,6 +26,7 @@ import {
   adherencePercent,
   attentionReport,
   auditLabel,
+  photoWorthKnowing,
   dateLabelFor,
   type DayBar,
   nextUp,
@@ -46,6 +47,7 @@ interface AuditRow {
   id: string;
   at: string;
   action: string;
+  byYou?: boolean;
 }
 interface History {
   occurrences: OccurrenceView[];
@@ -55,7 +57,7 @@ interface History {
 
 /**
  * The caregiver reminders UI is six small dashboard widgets (one per page section) instead of one big widget with
- * its own tabs: alerts, summary strip, today, manage, week graph, activity log. Each polls only what it shows.
+ * its own tabs: alerts, summary strip, today, manage, week graph, and the pill-photo lines of "Worth knowing". Each polls only what it shows.
  */
 
 /** One request at a time, then refresh; errors in plain words. */
@@ -417,38 +419,52 @@ export function RemindersWeek() {
 }
 
 /** Activity: who looked at what (the audit log). Folded by default: it is for checking, not for every glance. */
+/**
+ * "Worth knowing" lines (activity section, inside the "Needs you" box): only what ANOTHER caregiver did with pill photos. Every view and review is
+ * still recorded; the full record is one tap away. The shell supplies the box and its heading.
+ */
 export function RemindersActivity() {
   const { api, token } = useSession();
   const audit = usePoll(() => api<AuditRow[]>('GET', `${BASE}/audit`), 10000, [token]);
   const [open, setOpen] = useState(false);
   const rows = audit.data ?? [];
+  const items = photoWorthKnowing(rows);
   return (
-    <Card>
-      <Row gap={8}>
-        <View style={{ flex: 1, minWidth: 200 }}>
-          <AppText variant="title">Activity log{rows.length ? ` (${rows.length})` : ''}</AppText>
-          <AppText variant="small" tone="muted">
-            Sensitive actions are recorded here so you can always see who looked at what.
+    <View style={{ gap: 6 }}>
+      {!audit.data ? (
+        <AppText tone={audit.error ? 'warn' : 'muted'}>
+          {audit.error ? 'Can’t check the pill photo record right now.' : 'Checking pill photos…'}
+        </AppText>
+      ) : items.length === 0 ? (
+        <AppText tone="muted">Pill photos: no one else opened them.</AppText>
+      ) : (
+        items.map((n) => (
+          <AppText key={n.action}>
+            {`${n.text}${n.count > 1 ? ` (${n.count} times)` : ''}. Last: ${formatTime(n.lastAt)}.`}
           </AppText>
-        </View>
-        {rows.length ? (
-          <Chip label={open ? 'Hide' : 'Show'} selected={open} onPress={() => setOpen((o) => !o)} />
-        ) : (
-          <AppText tone="muted">Nothing recorded yet.</AppText>
-        )}
-      </Row>
+        ))
+      )}
+      {rows.length ? (
+        <Row gap={8}>
+          <Chip
+            label={open ? 'Hide pill photo record' : 'Full pill photo record'}
+            selected={open}
+            onPress={() => setOpen((o) => !o)}
+          />
+        </Row>
+      ) : null}
       {(open ? rows : []).map((a, i) => (
         <View key={a.id} style={[styles.rowItem, i > 0 && styles.rowDivider]}>
           <IconCircle icon={a.action === 'pill_frames_viewed' ? 'camera' : 'check'} size={30} />
           <View style={{ flex: 1, minWidth: 140 }}>
-            <AppText>{auditLabel(a.action)}</AppText>
+            <AppText>{a.byYou ? `${auditLabel(a.action)} (you)` : auditLabel(a.action)}</AppText>
             <AppText variant="small" tone="muted">
               {formatTime(a.at)}
             </AppText>
           </View>
         </View>
       ))}
-    </Card>
+    </View>
   );
 }
 

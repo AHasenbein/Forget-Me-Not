@@ -34,8 +34,9 @@ export const SECTIONS: readonly { id: DashboardSection; label: string }[] = [
   { id: 'alerts', label: 'Needs you now' },
   { id: 'summary', label: 'Summary' },
   { id: 'today', label: 'Today' },
-  { id: 'activity', label: 'Activity' },
+  { id: 'activity', label: 'Worth knowing' },
   { id: 'manage', label: 'Reminders' },
+  { id: 'messages', label: 'Messages' },
   { id: 'where', label: 'Location' },
   { id: 'week', label: 'Week' },
 ];
@@ -50,28 +51,52 @@ export function bySection(widgets: Widget[]) {
   })).filter((sec) => sec.widgets.length > 0);
 }
 
+/** One box of the wide-screen grid: a section, how many columns it spans, and sections drawn inside it. */
+export interface GridCell {
+  id: DashboardSection;
+  span: number;
+  /** Shown inside this box instead of in a box of their own ("Worth knowing" lives in the "needs you" box). */
+  with?: readonly DashboardSection[];
+}
+
 /**
- * Wide-screen dashboard, top to bottom: `top` spans the full width (the stats strip); then a grid of boxes, row by
- * row. Every box in a row is as tall as the tallest one, so the bottoms line up. The activity log sits under Today,
- * the "needs you" box (status + alerts) under Reminders. Every section appears exactly once (tested).
+ * Wide-screen dashboard, top to bottom: `top` spans the full width (the stats strip); then a grid of boxes in reading
+ * order: two rows of three (Today, Reminders, Location / Needs you, Messages, This week). The "needs you" box holds
+ * "Worth knowing" too. Every box in a row is as tall as the tallest one, so the bottoms line up. Every section appears
+ * exactly once (tested).
  */
-export const DASHBOARD_LAYOUT: {
-  top: readonly DashboardSection[];
-  grid: readonly (readonly DashboardSection[])[];
-} = {
+export const DASHBOARD_LAYOUT: { top: readonly DashboardSection[]; cells: readonly GridCell[] } = {
   top: ['summary'],
-  grid: [
-    ['today', 'manage', 'where'],
-    ['activity', 'alerts', 'week'],
+  cells: [
+    { id: 'today', span: 1 },
+    { id: 'manage', span: 1 },
+    { id: 'where', span: 1 },
+    { id: 'alerts', span: 1, with: ['activity'] },
+    { id: 'messages', span: 1 },
+    { id: 'week', span: 1 },
   ],
 };
 
-/** The grid for a given number of columns: the boxes in reading order, re-cut into rows of that width. */
-export function rowsFor(columns: number): DashboardSection[][] {
-  const cells = DASHBOARD_LAYOUT.grid.flat();
+/**
+ * Rows for a given number of columns, each row full: boxes in reading order, but a wide box that does not fit the rest
+ * of a row waits for the next one while a later narrow box fills the gap. Today every box is one column wide, so this is
+ * simply rows of `columns` boxes in reading order.
+ */
+export function rowsFor(columns: number): GridCell[][] {
   const n = Math.max(1, columns);
-  const rows: DashboardSection[][] = [];
-  for (let i = 0; i < cells.length; i += n) rows.push(cells.slice(i, i + n));
+  const queue = DASHBOARD_LAYOUT.cells.map((c) => ({ ...c, span: Math.min(c.span, n) }));
+  const rows: GridCell[][] = [];
+  while (queue.length) {
+    const row: GridCell[] = [];
+    let free = n;
+    for (let i = 0; i < queue.length && free > 0;) {
+      if (queue[i]!.span <= free) {
+        free -= queue[i]!.span;
+        row.push(queue.splice(i, 1)[0]!);
+      } else i++;
+    }
+    rows.push(row);
+  }
   return rows;
 }
 

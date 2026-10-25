@@ -181,8 +181,12 @@ describe('pill check routes', () => {
     const ok = await t.call(`/occurrences/${id}/frames`, t.a.caregiver);
     expect(ok.status).toBe(200);
     expect(((await ok.json()) as { frames: unknown[] }).frames).toHaveLength(3);
-    const audit = (await (await t.call('/audit', t.a.caregiver)).json()) as { action: string }[];
+    const audit = (await (await t.call('/audit', t.a.caregiver)).json()) as {
+      action: string;
+      byYou: boolean;
+    }[];
     expect(audit.map((a) => a.action)).toEqual(['pill_frames_viewed']);
+    expect(audit[0]!.byYou).toBe(true); // the caregiver's own view: full record only, not "Worth knowing"
     expect((await t.call('/audit', t.a.patient)).status).toBe(403);
   });
 

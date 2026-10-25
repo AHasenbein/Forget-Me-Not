@@ -31,8 +31,9 @@ In-memory store only for now; outside demo mode the store and caregiver lookup t
 
 ## Demo data
 
-`demoSeed` registers the demo caregiver for Margaret. Press as `demo:patient`, view as `demo:caregiver` (sees the park location),
-try `demo:daughter` (403: circle members cannot see or act on lost alerts). Run with `DATA_MODE=demo FEATURE_ALL=on`.
+`demoSeed` registers the demo caregiver for Margaret. Press as `demo:patient`, view as `demo:caregiver` (sees the park location
+until the patient's device reports, then the real one), try `demo:daughter` (403: circle members cannot see or act on lost
+alerts). Run with `DATA_MODE=demo FEATURE_ALL=on`.
 
 ## Rules baked in (don't weaken)
 
@@ -54,7 +55,8 @@ try `demo:daughter` (403: circle members cannot see or act on lost alerts). Run 
 - `ui/useActive.ts` polls every 5 s while no alert is open (that caregiver call reads no location) and every 30 s while one is open
   (each call then reads and audit-logs the location). It keeps the last data while reloading (the shared `usePoll` clears it).
 - The route inputs are strict empty objects: the client must send `{}` as the body, not no body.
-- In demo mode the location comes from the mock provider, so these reads do not appear in location-tracking's views list.
+- The location comes from location-tracking's real contract (owned port) when that feature is on, so each read appears in its
+  "who looked" list as a lost-button read. With location-tracking off it is the canned demo position.
 
 ## Needs a job runner (not built yet)
 

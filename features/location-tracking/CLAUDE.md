@@ -22,8 +22,13 @@ Routes (`/api/location-tracking`):
   Sessions live in memory and end by the server clock.
 - `GET /views` (primary_caregiver): audit log of who viewed the location and when (no coordinates).
 
-Contract: implements `LocationReadContract` (`server/service.ts`, `createLocationService`). Not yet registered
-with `registerLive('location', ...)`: that is a separate `chore/core/` PR.
+Contract: implements `LocationReadContract` (`server/service.ts`, `createLocationService`). The manifest's `register()`
+provides it as the owned `location` port (`port.ts`, lazy; `core/providers/owned.ts`), so `getProviders().location`
+(lost-button, later friends-family) reads the real device readings in demo AND live (lost-button itself is demo-only
+until it has a live store). Flag off = not registered.
+Contract access: demo = the seeded household (`readers`); live = the requester's own `profiles` row, read fresh on each
+call (`server/access.ts`: same patient, and primary caregiver / circle member with `view_location` / the patient;
+any lookup error denies). Contract reads are audited like route reads, so lost-button reads are in the full record (not in "Worth knowing").
 
 ## Data owned
 
@@ -34,7 +39,8 @@ Until the Supabase adapter lands, the in-memory store in `server/store.ts` is th
 ## Demo data
 
 `demoSeed` loads Margaret's last known position (2 minutes ago, from `DemoWorld`), registers who may read it
-(patient, caregiver, daughter; NOT the friend) and one earlier "daughter viewed" audit row. Run with
+(patient, caregiver, daughter; NOT the friend) and one earlier "daughter viewed" audit row. `demoReset` wipes device
+readings, find sessions and audit rows (Settings > Demo controls > Reset), then the seed runs again. Run with
 `DATA_MODE=demo FEATURE_ALL=on`; use `demo:caregiver` and `demo:friend` tokens to show the difference.
 
 ## Events
@@ -45,7 +51,9 @@ Until the Supabase adapter lands, the in-memory store in `server/store.ts` is th
 ## Edge cases (from the root checklist, plus feature-specific)
 
 - Reports every `REPORT_INTERVAL_MS` (5 min). Stale after 3 missed intervals (`STALE_AFTER_MS`), computed on the
-  server from its own clock. The client-sent value is never trusted. UI must say "last seen X ago", never "now".
+  server from real time, NOT `@core/clock` (deliberate exception to root rule 8): readings carry the device's real
+  time, so on a sped-up or skipped demo clock fresh readings would look old and find sessions would end in seconds.
+  The demo clock therefore does not age the location. The client-sent value is never trusted. UI must say "last seen X ago", never "now".
 - Out-of-order offline flush: last known is the latest `recordedAt`, not the last one received.
 - Future-dated readings (clock skew / spoofing) are rejected; bad coordinates are a 400.
 - Unlinked or ungranted caller: no coordinates in the response. Denied contract reads are audited too.
@@ -71,8 +79,9 @@ Until the Supabase adapter lands, the in-memory store in `server/store.ts` is th
   401/403 keeps the data and reports `signed_out` (no confusing logout); network errors keep it and report `offline`.
 - `http.ts`: uploader for `POST /readings`. `expo.ts`: expo-location + TaskManager adapter (`createDeviceTracker`,
   `startTracking`, `stopTracking`, `ensurePermissions`). `timeInterval` is Android-only, so the 5-minute cadence is
-  enforced in the tracker, not by the OS. iOS needs the user to grant "Always"; with "When in use" the tracker only runs
-  in the foreground.
+  enforced in the tracker, not by the OS. iOS needs the user to grant "Always" (background task); with "When in use"
+  `startTracking` runs a foreground `watchPositionAsync` instead, and its `stop()` ends it when the widget unmounts. A failed
+  first fix (GPS off, timeout) never stops tracking from starting. Tested with expo-location faked (`device-wiring.test.ts`).
 - **Not verified on a real device yet** (dev build required). **Not wired into the app yet:** `TaskManager.defineTask` must
   run at app start, so the app root (shell, shared) must import `tracker/expo.ts` and call `startTracking` after patient
   login; do that in a separate shell change agreed with the other dev.
@@ -83,11 +92,16 @@ Until the Supabase adapter lands, the in-memory store in `server/store.ts` is th
   is audit-logged, so it is read only on "Show last location" / "Refresh". Shows "Last seen at <time> (within about N m)",
   never "now"; stale or missing location is shown in warning colour with "no update never means they are safe".
   "Open in Maps" is a user-initiated link (no third-party map tiles are fetched, so the area is not leaked).
-- "Who looked recently": last 5 rows of `GET /views` in plain words (Caregiver / Family member / Lost-button alert; blocked
-  attempts in red), folded behind "Show" (the count is in the heading). Never shows ids or coordinates.
+- "Worth knowing" (`LocationWorthKnowing`, section `activity`, at the foot of the "Needs you" box): only what someone ELSE did, grouped with a count and last
+  time: a family member looked, another caregiver looked or started Find, and any blocked attempt (red, first). Your own looks
+  (`byYou` from `GET /views`) and automatic reads (lost-button, safe-zone) are left out, so an open lost alert polling every
+  30 s cannot drown a family member's look. "Full location record" shows the last 20 rows, your own marked "(you)". Never ids
+  or coordinates. Reading the list reads no location.
 - Patient widget (order 90, `PatientLocationSharing`): starts the tracker when the patient dashboard mounts (no shell change needed) and shows
   its real state (finding / working / turned off / cannot find). Web uses `tracker/web.ts` (`navigator.geolocation`, i.e. Google's
   location service in Chrome, foreground only, tab must stay open); phones use `tracker/expo.ts` (dev build, still unverified on a device).
+  The browser's `watchPosition` goes quiet while the device sits still, so the widget also asks again (`refreshWebPosition`,
+  via `usePoll`) every half interval (every 3 s while finding); the tracker throttles, so at most one report per interval.
 
 ## Later PRs
 

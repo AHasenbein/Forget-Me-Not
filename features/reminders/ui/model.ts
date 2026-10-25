@@ -333,3 +333,31 @@ export const AUDIT_LABEL: Record<string, string> = {
   pill_check_reviewed: 'A pill photo check was reviewed',
 };
 export const auditLabel = (action: string) => AUDIT_LABEL[action] ?? 'Activity recorded';
+
+const BY_ANOTHER: Record<string, string> = {
+  pill_frames_viewed: 'Another caregiver viewed pill photos',
+  pill_check_reviewed: 'Another caregiver reviewed a pill photo check',
+};
+
+/**
+ * "Worth knowing" lines: only caregivers can open pill photos, so the one thing worth telling you is that ANOTHER
+ * caregiver did. Your own views stay in the full record. Rows come newest first; repeats are grouped.
+ */
+export function photoWorthKnowing(
+  rows: readonly { action: string; at: string; byYou?: boolean }[],
+) {
+  const groups = new Map<string, { action: string; text: string; count: number; lastAt: string }>();
+  for (const r of rows) {
+    if (r.byYou) continue;
+    const g = groups.get(r.action);
+    if (g) g.count++;
+    else
+      groups.set(r.action, {
+        action: r.action,
+        text: BY_ANOTHER[r.action] ?? 'Another caregiver did something with pill photos',
+        count: 1,
+        lastAt: r.at,
+      });
+  }
+  return [...groups.values()];
+}

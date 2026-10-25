@@ -70,3 +70,23 @@ export function startWebTracking(
   );
   return () => navigator.geolocation.clearWatch(id);
 }
+
+/**
+ * `watchPosition` only fires when the browser thinks the position changed, so a device sitting still goes quiet and
+ * the caregiver sees "old". Asking again on the report cadence keeps a still patient fresh (the tracker throttles).
+ */
+export function refreshWebPosition(tracker: Tracker, precise = false): Promise<void> {
+  return new Promise((resolve) => {
+    if (typeof navigator === 'undefined' || !navigator.geolocation) return resolve();
+    navigator.geolocation.getCurrentPosition(
+      (p) => void tracker.onFix(toFix(p)).finally(resolve),
+      () => resolve(), // the watcher already reports denied / unavailable
+      // While finding it is asked every few seconds: a slow lookup must not pile up behind the next one.
+      {
+        enableHighAccuracy: precise,
+        maximumAge: 0,
+        timeout: precise ? FIND_REPORT_INTERVAL_MS : 30_000,
+      },
+    );
+  });
+}

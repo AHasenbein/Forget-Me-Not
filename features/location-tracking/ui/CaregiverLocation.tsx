@@ -3,19 +3,18 @@ import { Linking, View } from 'react-native';
 import { ApiError } from '@core/client/api';
 import { formatTime } from '@core/client/format';
 import { useSession } from '@core/client/session';
-import { AppText, BigButton, Card, Chip, Icon, Row } from '@core/design-system/components';
+import { AppText, BigButton, Card, Icon, Row } from '@core/design-system/components';
 import { palette } from '@core/design-system/tokens';
 import type { LocationReading } from '@contracts/location';
 import { FindThem } from './FindThem';
-import { caregiverError, lastSeenLine, mapsUrl, viewLabel, viewTime, type ViewRow } from './model';
+import { caregiverError, lastSeenLine, mapsUrl } from './model';
 
 const BASE = '/api/location-tracking';
-const SHOWN_VIEWS = 5;
 
 /**
  * Caregiver: the patient's last known location. It is NOT read when the dashboard opens: every read is
- * audit-logged, so it is read only when the caregiver asks ("Show last location" / "Refresh"). That keeps the
- * "who looked" list meaningful.
+ * audit-logged, so it is read only when the caregiver asks ("Show last location" / "Refresh"). Who looked is in the
+ * "Worth knowing" part of the "Needs you" box (`LocationWorthKnowing`), not here.
  */
 export function CaregiverLocation() {
   const { api, token } = useSession();
@@ -23,21 +22,10 @@ export function CaregiverLocation() {
   const [asked, setAsked] = useState(false);
   const [busy, setBusy] = useState(false);
   const [problem, setProblem] = useState('');
-  const [views, setViews] = useState<ViewRow[]>([]);
-  const [showViews, setShowViews] = useState(false);
-
-  const loadViews = async () => {
-    try {
-      setViews((await api<{ views: ViewRow[] }>('GET', `${BASE}/views`)).views);
-    } catch {
-      // the list is secondary; the location card still works without it
-    }
-  };
   // Reset when the signed-in person changes (demo persona switch).
   useEffect(() => {
     setLoc(null);
     setAsked(false);
-    void loadViews();
   }, [token]);
 
   const read = async () => {
@@ -47,7 +35,6 @@ export function CaregiverLocation() {
     try {
       setLoc((await api<{ location: LocationReading | null }>('GET', `${BASE}/location`)).location);
       setAsked(true);
-      void loadViews(); // this read is now in the list too
     } catch (e) {
       setProblem(caregiverError(e instanceof ApiError ? e.code : 'offline'));
     } finally {
@@ -85,46 +72,13 @@ export function CaregiverLocation() {
       ) : (
         <>
           <AppText variant="small" tone="muted">
-            Every look is recorded, so you can always see who checked the location.
+            Every look is recorded; see “Worth knowing” for who else checked.
           </AppText>
           <BigButton label="Show last location" busy={busy} onPress={read} />
         </>
       )}
       {problem ? <AppText tone="danger">{problem}</AppText> : null}
       <FindThem />
-
-      <View style={{ gap: 6, borderTopWidth: 1, borderTopColor: palette.border, paddingTop: 10 }}>
-        <Row gap={8}>
-          <View style={{ flex: 1 }}>
-            <AppText variant="small" bold>
-              Who looked recently{views.length ? ` (${Math.min(views.length, SHOWN_VIEWS)})` : ''}
-            </AppText>
-          </View>
-          {views.length ? (
-            <Chip
-              label={showViews ? 'Hide' : 'Show'}
-              selected={showViews}
-              onPress={() => setShowViews((v) => !v)}
-            />
-          ) : (
-            <AppText variant="small" tone="muted">
-              Nobody yet.
-            </AppText>
-          )}
-        </Row>
-        {(showViews ? views.slice(0, SHOWN_VIEWS) : []).map((v) => (
-          <View key={v.id} style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
-            <View style={{ flex: 1, minWidth: 180 }}>
-              <AppText variant="small" tone={v.outcome === 'denied' ? 'danger' : undefined}>
-                {viewLabel(v)}
-              </AppText>
-            </View>
-            <AppText variant="small" tone="muted">
-              {viewTime(v.at)}
-            </AppText>
-          </View>
-        ))}
-      </View>
     </Card>
   );
 }

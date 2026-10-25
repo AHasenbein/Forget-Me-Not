@@ -60,7 +60,8 @@ Try it: `npm run dev:api:demo`, then call with `Authorization: Bearer demo:careg
   reports to the dashboard status line via `useAttention` / `attentionReport` in `ui/model.ts`: a missed pill or "photos look wrong" is urgent), summary (stats strip:
   date, done, coming up, missed, week %, next; the overall "all clear" is the shell's status line, not this strip), today (today's list), manage (schedule list with
   pause/resume + two-tap delete; the add form is folded behind "Add a reminder", with a "Custom" choice that asks "What should we remind
-  them?"), week (7-day graph), activity (audit log, folded by default). Circle members see nothing from this feature.
+  them?"), week (7-day graph), activity (the pill-photo lines of "Worth knowing" in the shell's "Needs you" box: only what ANOTHER caregiver did,
+  via `byYou` from `GET /audit` and `photoWorthKnowing`; the full record is behind "Full pill photo record"). Circle members see nothing from this feature.
 - `ui/model.ts` holds the logic (unit-tested); the `.tsx` files are thin.
 
 ## Pill photo check

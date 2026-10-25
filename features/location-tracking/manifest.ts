@@ -1,4 +1,6 @@
 import { defineFeature } from '@core/feature-registry/manifest';
+import { provideOwned } from '@core/providers/owned';
+import { locationPort } from './port';
 import { emptySchema, ingestSchema } from './server/schema';
 
 /**
@@ -53,6 +55,11 @@ export default defineFeature({
   nav: [],
   permissions: ['view_location'],
   events: { emits: [], consumes: [] },
+  // Single owner of location: other features' `getProviders().location` reads these real readings (synchronous: no
+  // race with the first request). Flag off = not registered, so they get the canned demo one (or none in live).
+  register: () => provideOwned('location', locationPort),
+  // Demo "Reset": forget device readings, find sessions and audit rows, then demoSeed runs again.
+  demoReset: async () => void (await import('./server/runtime')).resetRuntime(),
   demoSeed: async ({ world }) => (await import('./demo/seed')).seedLocation(world),
   migrations: ['location-tracking__202610241800_init.sql'],
 });

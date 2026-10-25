@@ -77,8 +77,16 @@ describe('location-tracking', () => {
         patientId: patient.id,
         purpose: 'caregiver_view',
         outcome: 'served',
+        byYou: true,
       });
       expect(JSON.stringify(views)).not.toContain('40.71'); // audit never holds coordinates
+    });
+
+    it("the daughter's look is not byYou for the caregiver (it belongs in Worth knowing)", async () => {
+      await call('/readings', patient, { readings: [reading()] });
+      await call('/location', daughter);
+      const { views } = await (await call('/views', caregiver)).json();
+      expect(views[0]).toMatchObject({ purpose: 'circle_view', byYou: false });
     });
 
     it('circle member with the grant can view and is audited as circle_view', async () => {
