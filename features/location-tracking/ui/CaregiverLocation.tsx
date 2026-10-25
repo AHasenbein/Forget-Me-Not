@@ -14,7 +14,7 @@ const BASE = '/api/location-tracking';
 /**
  * Caregiver: the patient's last known location. It is NOT read when the dashboard opens: every read is
  * audit-logged, so it is read only when the caregiver asks ("Show last location" / "Refresh"). Who looked is in the
- * dashboard's "Worth knowing" box (`LocationWorthKnowing`), not here.
+ * "Worth knowing" part of the "Needs you" box (`LocationWorthKnowing`), not here.
  */
 export function CaregiverLocation() {
   const { api, token } = useSession();

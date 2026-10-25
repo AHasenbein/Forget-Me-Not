@@ -8,8 +8,9 @@ import { notableLine, viewLabel, viewTime, worthKnowing, type ViewRow } from './
 const FULL_RECORD = 20;
 
 /**
- * Caregiver "Worth knowing" box: only what someone ELSE did with the location (a family member looked, a blocked
- * attempt). Every look is still recorded; the full record is one tap away. Reading this list reads no location.
+ * Caregiver "Worth knowing" lines (inside the "Needs you" box): only what someone ELSE did with the location (a family
+ * member looked, a blocked attempt). Every look is still recorded; the full record is one tap away. Reading this list
+ * reads no location.
  */
 export function LocationWorthKnowing() {
   const { api, token } = useSession();

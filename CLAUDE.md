@@ -73,7 +73,7 @@ tests/             architecture/ (boundary, route-auth), smoke/, e2e/, integrati
    `ui-registry.generated.ts`). Never import `ui/` from `manifest.ts` (the server must not load React Native). Keep view
    logic in pure `.ts` (unit-testable) and the `.tsx` thin. Build with `core/design-system/components` only.
    The caregiver/family UI is `standard` density (ordinary app sizes, set by the shell; Text size is patient-only); patient UI
-   rules apply to patient widgets. The `activity` section is the shell's "Worth knowing" box: plain lines (no Card) about what someone ELSE did, with each
+   rules apply to patient widgets. The `activity` section is "Worth knowing", at the foot of the shell's "Needs you" box: plain lines (no Card) about what someone ELSE did, with each
    full audit record one tap away (it must stay visible to the caregiver). Caregiver alert widgets report to the dashboard status line with `useAttention`
    (`core/client/attention.ts`): `null` while loading, `unknown` when a poll failed, never silence as "all clear".
 8. **Time and background work**: read time ONLY from `@core/clock` `now()` (services take `now` as a dependency so tests use

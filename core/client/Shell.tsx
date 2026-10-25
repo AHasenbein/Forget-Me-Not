@@ -286,32 +286,38 @@ function StatusLine({ status }: { status: DashboardStatus }) {
 }
 
 /**
- * "Worth knowing" box (the `activity` section): not alerts, just what someone else did that you would want to hear
- * about (a family member looked at the location, another caregiver opened pill photos). Each feature's full record
- * is one tap away inside it, so every sensitive view stays visible to the caregiver without filling the page.
+ * "Needs you" box: the status banner, then each open alert card (lost, payment, call, bill, missed reminder), then
+ * "Worth knowing" (the `activity` section): not alerts, just what someone else did that you would want to hear about
+ * (a family member looked at the location, another caregiver opened pill photos). Each full record is one tap away
+ * inside it, so every sensitive view stays visible to the caregiver without a box of its own.
  */
-function WorthKnowing({ children }: { children: ReactNode }) {
-  return (
-    <Card>
-      <AppText variant="title">Worth knowing</AppText>
-      {children}
-    </Card>
-  );
-}
-
-/** "Needs you" box: the status banner, then each open alert card (lost, payment, call, bill, missed reminder). */
-function NeedsYou({ status, children }: { status: DashboardStatus; children: ReactNode }) {
+function NeedsYou({
+  status,
+  children,
+  worthKnowing,
+}: {
+  status: DashboardStatus;
+  children: ReactNode;
+  worthKnowing: ReactNode[];
+}) {
   return (
     <Card>
       <StatusLine status={status} />
       {children}
+      {worthKnowing.length ? (
+        <View style={{ gap: 8, borderTopWidth: 1, borderTopColor: palette.border, paddingTop: 12 }}>
+          <AppText variant="title">Worth knowing</AppText>
+          {worthKnowing}
+        </View>
+      ) : null}
     </Card>
   );
 }
 
 /**
- * Caregiver dashboard: the stats strip, then two rows of three boxes, each row's boxes the same height: Today, Reminders,
- * Location; then Worth knowing, the "needs you" box, This week (rows of two on narrower windows). The box's status banner says whether anything
+ * Caregiver dashboard: the stats strip, then full rows of boxes on one column grid, each row's boxes the same height:
+ * Today, Reminders, Location; then the "needs you" box (with Worth knowing, two columns wide) and This week (on narrower
+ * windows: rows of two, the "needs you" box last at full width; see `rowsFor`). The box's status banner says whether anything
  * needs you (widgets report through `useAttention`; it never says "all clear" while something is loading or failed),
  * with the open alert cards under it. It is an ordinary app UI (`standard` density: normal type and controls; Text size is for the
  * patient only). The page scrolls a little on small windows instead of shrinking.
@@ -360,16 +366,14 @@ function CaregiverPage() {
       </ScrollView>
     </DensityContext.Provider>
   );
-  // One section's tiles; `alerts` becomes the "needs you" box (always shown, so the status is never missing) and
-  // `activity` the one "Worth knowing" box around its widgets.
+  // One section's tiles; `alerts` becomes the "needs you" box (always shown, so the status is never missing) with
+  // "Worth knowing" (`activity`) inside it, so `activity` has no box of its own.
   const section = (id: DashboardSection) =>
     id === 'alerts' ? (
-      <NeedsYou key="needs-you" status={status}>
+      <NeedsYou key="needs-you" status={status} worthKnowing={widgetsIn(['activity']).map(slot)}>
         {widgetsIn(['alerts']).map(slot)}
       </NeedsYou>
-    ) : id === 'activity' ? (
-      <WorthKnowing key="worth-knowing">{widgetsIn(['activity']).map(slot)}</WorthKnowing>
-    ) : (
+    ) : id === 'activity' ? null : (
       widgetsIn([id]).map(slot)
     );
 
@@ -381,20 +385,30 @@ function CaregiverPage() {
   return frame(
     <>
       {DASHBOARD_LAYOUT.top.map(section)}
-      {/* Rows of equal-width boxes. Each box stretches to the tallest in its row, so the bottoms line up. */}
+      {/* Full rows of boxes on one column grid. Each box stretches to the tallest in its row, so the bottoms line up. */}
       {rowsFor(perRow).map((row) => (
         <View
-          key={row.join()}
+          key={row.map((c) => c.id).join()}
           style={{ flexDirection: 'row', alignItems: 'stretch', gap: TILE_GAP }}
         >
-          {row.map((id) => (
-            <View key={id} style={{ flex: 1, minWidth: 0, gap: TILE_GAP }}>
-              <FillContext.Provider value>{section(id)}</FillContext.Provider>
+          {row.map((c) => (
+            // A box spanning N columns also covers the N-1 gaps between them, so its edges line up with the row above.
+            <View
+              key={c.id}
+              style={{
+                flexGrow: c.span,
+                flexShrink: 1,
+                flexBasis: (c.span - 1) * TILE_GAP,
+                minWidth: 0,
+                gap: TILE_GAP,
+              }}
+            >
+              <FillContext.Provider value>{section(c.id)}</FillContext.Provider>
             </View>
           ))}
-          {/* A short last row keeps the same box width. */}
-          {Array.from({ length: perRow - row.length }, (_, i) => (
-            <View key={`pad${i}`} style={{ flex: 1 }} />
+          {/* A short last row keeps the same column width. */}
+          {Array.from({ length: perRow - row.reduce((t, c) => t + c.span, 0) }, (_, i) => (
+            <View key={`pad${i}`} style={{ flexGrow: 1, flexBasis: 0 }} />
           ))}
         </View>
       ))}

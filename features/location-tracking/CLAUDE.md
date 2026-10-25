@@ -92,7 +92,7 @@ readings, find sessions and audit rows (Settings > Demo controls > Reset), then 
   is audit-logged, so it is read only on "Show last location" / "Refresh". Shows "Last seen at <time> (within about N m)",
   never "now"; stale or missing location is shown in warning colour with "no update never means they are safe".
   "Open in Maps" is a user-initiated link (no third-party map tiles are fetched, so the area is not leaked).
-- "Worth knowing" box (`LocationWorthKnowing`, section `activity`): only what someone ELSE did, grouped with a count and last
+- "Worth knowing" (`LocationWorthKnowing`, section `activity`, at the foot of the "Needs you" box): only what someone ELSE did, grouped with a count and last
   time: a family member looked, another caregiver looked or started Find, and any blocked attempt (red, first). Your own looks
   (`byYou` from `GET /views`) and automatic reads (lost-button, safe-zone) are left out, so an open lost alert polling every
   30 s cannot drown a family member's look. "Full location record" shows the last 20 rows, your own marked "(you)". Never ids

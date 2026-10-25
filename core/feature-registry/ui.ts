@@ -18,7 +18,8 @@ export interface Widget {
 
 /**
  * Tiles of the caregiver dashboard (labels, order and layout: core/client/widget-groups.ts). `alerts` and `activity`
- * are boxes the shell draws ("Needs you", "Worth knowing"): `activity` widgets render plain lines, no Card of their own.
+ * are drawn by the shell: one "Needs you" box with "Worth knowing" (`activity`) at its foot; `activity` widgets render
+ * plain lines, no Card of their own.
  */
 export type DashboardSection =
   'summary' | 'alerts' | 'today' | 'manage' | 'week' | 'where' | 'activity';

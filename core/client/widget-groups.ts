@@ -50,28 +50,50 @@ export function bySection(widgets: Widget[]) {
   })).filter((sec) => sec.widgets.length > 0);
 }
 
+/** One box of the wide-screen grid: a section, how many columns it spans, and sections drawn inside it. */
+export interface GridCell {
+  id: DashboardSection;
+  span: number;
+  /** Shown inside this box instead of in a box of their own ("Worth knowing" lives in the "needs you" box). */
+  with?: readonly DashboardSection[];
+}
+
 /**
- * Wide-screen dashboard, top to bottom: `top` spans the full width (the stats strip); then a grid of boxes, row by
- * row. Every box in a row is as tall as the tallest one, so the bottoms line up. "Worth knowing" sits under Today,
- * the "needs you" box (status + alerts) under Reminders. Every section appears exactly once (tested).
+ * Wide-screen dashboard, top to bottom: `top` spans the full width (the stats strip); then a grid of boxes in reading
+ * order. The "needs you" box holds "Worth knowing" too and spans two columns, so every row is full and even. Every box in
+ * a row is as tall as the tallest one, so the bottoms line up. Every section appears exactly once (tested).
  */
-export const DASHBOARD_LAYOUT: {
-  top: readonly DashboardSection[];
-  grid: readonly (readonly DashboardSection[])[];
-} = {
+export const DASHBOARD_LAYOUT: { top: readonly DashboardSection[]; cells: readonly GridCell[] } = {
   top: ['summary'],
-  grid: [
-    ['today', 'manage', 'where'],
-    ['activity', 'alerts', 'week'],
+  cells: [
+    { id: 'today', span: 1 },
+    { id: 'manage', span: 1 },
+    { id: 'where', span: 1 },
+    { id: 'alerts', span: 2, with: ['activity'] },
+    { id: 'week', span: 1 },
   ],
 };
 
-/** The grid for a given number of columns: the boxes in reading order, re-cut into rows of that width. */
-export function rowsFor(columns: number): DashboardSection[][] {
-  const cells = DASHBOARD_LAYOUT.grid.flat();
+/**
+ * Rows for a given number of columns, each row full: boxes in reading order, but a wide box that does not fit the rest
+ * of a row waits for the next one while a later narrow box fills the gap (3 columns: Today, Reminders, Location / Needs
+ * you (2), This week; 2 columns: Today, Reminders / Location, This week / Needs you).
+ */
+export function rowsFor(columns: number): GridCell[][] {
   const n = Math.max(1, columns);
-  const rows: DashboardSection[][] = [];
-  for (let i = 0; i < cells.length; i += n) rows.push(cells.slice(i, i + n));
+  const queue = DASHBOARD_LAYOUT.cells.map((c) => ({ ...c, span: Math.min(c.span, n) }));
+  const rows: GridCell[][] = [];
+  while (queue.length) {
+    const row: GridCell[] = [];
+    let free = n;
+    for (let i = 0; i < queue.length && free > 0;) {
+      if (queue[i]!.span <= free) {
+        free -= queue[i]!.span;
+        row.push(queue.splice(i, 1)[0]!);
+      } else i++;
+    }
+    rows.push(row);
+  }
   return rows;
 }
 

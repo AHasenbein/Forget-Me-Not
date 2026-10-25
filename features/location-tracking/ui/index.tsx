@@ -14,7 +14,7 @@ export default defineFeatureUi({
       order: 20,
       Component: CaregiverLocation,
     },
-    // "Worth knowing" box: who ELSE looked (family, blocked attempts); the full record is one tap away.
+    // "Worth knowing" (inside the "Needs you" box): who ELSE looked (family, blocked attempts); the full record is one tap away.
     {
       id: 'location-worth-knowing',
       role: 'primary_caregiver',

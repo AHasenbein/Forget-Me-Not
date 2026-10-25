@@ -420,7 +420,7 @@ export function RemindersWeek() {
 
 /** Activity: who looked at what (the audit log). Folded by default: it is for checking, not for every glance. */
 /**
- * "Worth knowing" box (activity section): only what ANOTHER caregiver did with pill photos. Every view and review is
+ * "Worth knowing" lines (activity section, inside the "Needs you" box): only what ANOTHER caregiver did with pill photos. Every view and review is
  * still recorded; the full record is one tap away. The shell supplies the box and its heading.
  */
 export function RemindersActivity() {
