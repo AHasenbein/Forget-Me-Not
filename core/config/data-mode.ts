@@ -2,11 +2,11 @@
  * demo = canned, deterministic, fictional data + mock adapters (no keys, no real people contacted).
  * live = real adapters (Supabase data, real push/SMS, AI, Plaid sandbox).
  * Default: demo everywhere EXCEPT production. Demo in production needs ALLOW_DEMO_IN_PRODUCTION=true.
- * Per-service override: DATA_MODE_AI | DATA_MODE_VISION | DATA_MODE_PLAID | DATA_MODE_NOTIFIER | DATA_MODE_LOCATION.
+ * Per-service override: DATA_MODE_AI | DATA_MODE_VISION | DATA_MODE_DOCUMENTS | DATA_MODE_PLAID | DATA_MODE_NOTIFIER | DATA_MODE_LOCATION.
  * Mobile reads EXPO_PUBLIC_DATA_MODE (Expo inlines literal `process.env.EXPO_PUBLIC_*` at build time).
  */
 export type DataMode = 'demo' | 'live';
-export type Service = 'ai' | 'vision' | 'plaid' | 'notifier' | 'location' | 'data';
+export type Service = 'ai' | 'vision' | 'documents' | 'plaid' | 'notifier' | 'location' | 'data';
 
 type Source = Record<string, string | undefined>;
 const processSource = (): Source => ({
@@ -17,6 +17,7 @@ const processSource = (): Source => ({
     process.env.ALLOW_DEMO_IN_PRODUCTION ?? process.env.EXPO_PUBLIC_ALLOW_DEMO_IN_PRODUCTION,
   DATA_MODE_AI: process.env.DATA_MODE_AI,
   DATA_MODE_VISION: process.env.DATA_MODE_VISION,
+  DATA_MODE_DOCUMENTS: process.env.DATA_MODE_DOCUMENTS,
   DATA_MODE_PLAID: process.env.DATA_MODE_PLAID,
   DATA_MODE_NOTIFIER: process.env.DATA_MODE_NOTIFIER,
   DATA_MODE_LOCATION: process.env.DATA_MODE_LOCATION,

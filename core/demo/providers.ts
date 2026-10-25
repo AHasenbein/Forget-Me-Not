@@ -1,3 +1,4 @@
+import { UNREADABLE } from '../ai/documents';
 import { createDemoVision } from './vision';
 import { createMockAi } from '../testing/mocks/ai';
 import { createMockLocation } from '../testing/mocks/location';
@@ -25,6 +26,8 @@ export function demoProviders(world: DemoWorld): Providers {
   return {
     ai: createMockAi({ text: world.scamCall.summary, confidence: world.scamCall.confidence }),
     vision: createDemoVision(),
+    // Demo reads nothing by itself: the bill-reader feature registers its sample bills; any other picture is "unreadable".
+    documents: { readBill: async () => UNREADABLE },
     plaid: { listTransactions: async () => world.bills },
     notifier: createMockNotifier(),
     location: createMockLocation({

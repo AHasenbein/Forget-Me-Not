@@ -1,5 +1,6 @@
 import type { LocationReadContract } from '@contracts/location';
 import type { AiClient } from '../ai/client';
+import type { DocumentReader } from '../ai/documents';
 import type { VisionClient } from '../ai/vision';
 import type { TokenVerifier } from '../auth/types';
 import type { Notifier } from '../notifications';
@@ -21,6 +22,8 @@ export interface Providers {
   ai: AiClient;
   /** Photo checks (e.g. pill taken). Own switch: DATA_MODE_VISION (live needs OPENROUTER_API_KEY). */
   vision: VisionClient;
+  /** Reads bills from photos. Own switch: DATA_MODE_DOCUMENTS (live needs OPENROUTER_API_KEY). */
+  documents: DocumentReader;
   plaid: PlaidPort;
   notifier: Notifier;
   location: LocationReadContract;

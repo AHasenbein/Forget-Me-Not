@@ -1,6 +1,7 @@
 import { serve } from '@hono/node-server';
 import { Hono } from 'hono';
 import { cors } from 'hono/cors';
+import { createOpenRouterDocuments } from '../core/ai/openrouter-documents';
 import { createOpenRouterText } from '../core/ai/openrouter-text';
 import { createOpenRouterVision } from '../core/ai/openrouter-vision';
 import { createClient } from '@supabase/supabase-js';
@@ -30,6 +31,15 @@ if (dataMode('vision') === 'live') {
   const model = process.env.OPENROUTER_MODEL;
   if (!apiKey) throw new Error('DATA_MODE_VISION=live needs OPENROUTER_API_KEY in .env');
   registerLive('vision', createOpenRouterVision({ apiKey, model: model || undefined }));
+}
+// Bill reader (photo of a bill -> plain description): live only when asked for (DATA_MODE_DOCUMENTS=live).
+if (dataMode('documents') === 'live') {
+  const apiKey = openRouterKey;
+  if (!apiKey) throw new Error('DATA_MODE_DOCUMENTS=live needs OPENROUTER_API_KEY in .env');
+  registerLive(
+    'documents',
+    createOpenRouterDocuments({ apiKey, model: process.env.OPENROUTER_MODEL || undefined }),
+  );
 }
 // Text AI (e.g. the money check's second opinion): live only when asked for (DATA_MODE_AI=live), and then it needs a key.
 if (dataMode('ai') === 'live') {
