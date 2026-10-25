@@ -1,9 +1,10 @@
 import { useEffect, useState } from 'react';
 import { View } from 'react-native';
 import { ApiError } from '@core/client/api';
+import { useAttention } from '@core/client/attention';
 import { formatTime } from '@core/client/format';
 import { useSession } from '@core/client/session';
-import { AppText, BigButton, Card, Icon } from '@core/design-system/components';
+import { AppText, BigButton, Card, Icon, Row } from '@core/design-system/components';
 import { palette } from '@core/design-system/tokens';
 import type { BankTransaction } from '@core/providers/types';
 import type { MoneyRequest } from '../schemas';
@@ -29,11 +30,30 @@ interface Active {
 /** Caregiver: renders NOTHING until the patient asks. Then the verdict, the reasons, and two buttons. */
 export function CaregiverCheck() {
   const { api, token } = useSession();
-  const { data, reload } = useRequest(() => api<Active>('GET', `${BASE}/requests/active`), [token]);
+  const { data, failed, reload } = useRequest(
+    () => api<Active>('GET', `${BASE}/requests/active`),
+    [token],
+  );
   const [busy, setBusy] = useState(false);
   const [problem, setProblem] = useState('');
   const [armed, setArmed] = useState(false);
   const r = data?.request ?? null;
+  const waiting = r?.status === 'pending';
+  // The dashboard status line: a payment waiting for your answer (urgent when it looks like a scam).
+  useAttention(
+    !data && !failed
+      ? null
+      : {
+          count: waiting ? 1 : 0,
+          severity: r?.level === 'stop' ? 'urgent' : 'warning',
+          what: waiting
+            ? r?.level === 'stop'
+              ? 'A payment that looks like a scam'
+              : 'A payment to check'
+            : undefined,
+          unknown: failed ? 'payments' : undefined,
+        },
+  );
   // "Tap again" expires, so a stray later tap cannot approve a payment.
   useEffect(() => {
     if (!armed) return;
@@ -112,17 +132,19 @@ export function CaregiverCheck() {
         If you do not answer by {formatTime(r.expiresAt)}, this is declined and they are told not to
         pay. Nothing is paid by this app.
       </AppText>
-      <BigButton tone="danger" label="Don’t pay" busy={busy} onPress={() => decide('decline')} />
-      <BigButton
-        tone={armed ? 'success' : 'ghost'}
-        label={armed ? 'Tap again: it’s OK to pay' : 'It’s OK to pay'}
-        busy={busy}
-        onPress={() => {
-          if (!armed) return setArmed(true);
-          setArmed(false);
-          return decide('approve');
-        }}
-      />
+      <Row gap={8}>
+        <BigButton tone="danger" label="Don’t pay" busy={busy} onPress={() => decide('decline')} />
+        <BigButton
+          tone={armed ? 'success' : 'ghost'}
+          label={armed ? 'Tap again: it’s OK to pay' : 'It’s OK to pay'}
+          busy={busy}
+          onPress={() => {
+            if (!armed) return setArmed(true);
+            setArmed(false);
+            return decide('approve');
+          }}
+        />
+      </Row>
       {problem ? <AppText tone="danger">{problem}</AppText> : null}
     </Card>
   );

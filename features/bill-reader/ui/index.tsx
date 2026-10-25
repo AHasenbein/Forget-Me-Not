@@ -13,6 +13,12 @@ export default defineFeatureUi({
       Component: PatientBill,
     },
     // Near the top, and renders nothing until the patient has shown a bill.
-    { id: 'bill-reader', role: 'primary_caregiver', order: 6, Component: CaregiverBills },
+    {
+      id: 'bill-reader',
+      role: 'primary_caregiver',
+      section: 'alerts',
+      order: 6,
+      Component: CaregiverBills,
+    },
   ],
 });

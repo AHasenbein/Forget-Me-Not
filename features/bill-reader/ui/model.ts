@@ -141,3 +141,7 @@ export const sourceText = (src: Source, outcome: Outcome) =>
       : 'Read by AI';
 
 export const POLL_MS = 5_000;
+
+/** Flagged bills the caregiver has not marked "Seen it" yet: these count on the dashboard status line. */
+export const unseenFlagged = (scans: readonly CaregiverScan[], seen: readonly string[]) =>
+  scans.filter((s) => s.outcome === 'flagged' && !seen.includes(s.id));

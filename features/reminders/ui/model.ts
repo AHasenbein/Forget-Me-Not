@@ -1,4 +1,5 @@
 import type { IconName } from '@core/design-system/tokens';
+import type { Attention } from '@core/feature-registry/ui';
 import type { Occurrence, ReminderKind } from '../schemas';
 import type { Phase } from '../service';
 
@@ -18,7 +19,15 @@ export const KIND: Record<
   },
   shower: { icon: 'shower', task: 'Time for your shower', label: 'Shower', done: 'I did it' },
   feed_pets: { icon: 'paw', task: 'Time to feed your pets', label: 'Feed pets', done: 'I did it' },
+  custom: { icon: 'check', task: 'Time for your reminder', label: 'Custom', done: 'I did it' },
 };
+
+/** Short name of a reminder: a custom one shows the caregiver's words ("Water the plants"). */
+export const labelOf = (r: { kind: ReminderKind; label?: string }) =>
+  r.kind === 'custom' && r.label ? r.label : KIND[r.kind].label;
+/** The patient's headline for a reminder that is due now. */
+export const taskOf = (r: { kind: ReminderKind; label?: string }) =>
+  r.kind === 'custom' && r.label ? r.label : KIND[r.kind].task;
 
 export type PatientFocus =
   | { kind: 'task'; occurrence: OccurrenceView; canSnooze: boolean; others: OccurrenceView[] }
@@ -99,6 +108,8 @@ export function caregiverError(code: string): string {
       return 'That’s the most reminders allowed (20).';
     case 'not_found':
       return 'That reminder no longer exists.';
+    case 'invalid_input':
+      return 'Please check the reminder: use plain words (no links), 2 to 40 letters, and a time like 8:30.';
     default:
       return `That didn’t work (${code}).`;
   }
@@ -179,6 +190,29 @@ export function caregiverRows(
         return { ...base, status: `At ${at}`, tone: 'neutral' as const };
     }
   });
+}
+
+/**
+ * What the caregiver alerts widget tells the dashboard status line: missed reminders plus pill photos to check.
+ * A missed pill, or photos that look wrong, are urgent. `failed` = the last refresh did not get through.
+ */
+export function attentionReport(rows: readonly CaregiverRow[], failed: boolean): Attention {
+  const missed = rows.filter((r) => r.needsAttention);
+  const reviews = rows.filter((r) => r.needsReview);
+  const urgent =
+    missed.some((r) => r.occurrence.kind === 'pill') ||
+    reviews.some((r) => r.occurrence.confirmation?.verification === 'rejected');
+  const what = [
+    missed.length === 1 && missed[0] ? `${labelOf(missed[0].occurrence)} missed` : '',
+    missed.length > 1 ? `${missed.length} reminders missed` : '',
+    reviews.length ? 'Pill photos to check' : '',
+  ].filter(Boolean);
+  return {
+    count: missed.length + reviews.length,
+    severity: urgent ? 'urgent' : 'warning',
+    what: what.length ? what.join(' · ') : undefined,
+    unknown: failed ? 'reminders' : undefined,
+  };
 }
 
 export function caregiverCounts(rows: readonly CaregiverRow[]) {

@@ -6,6 +6,12 @@ export default defineFeatureUi({
   widgets: [
     // After the reminders. The patient widget starts the device tracker and reports its real state.
     { id: 'location-sharing', role: 'patient', order: 90, Component: PatientLocationSharing },
-    { id: 'location-tracking', role: 'primary_caregiver', order: 20, Component: CaregiverLocation },
+    {
+      id: 'location-tracking',
+      role: 'primary_caregiver',
+      section: 'where',
+      order: 20,
+      Component: CaregiverLocation,
+    },
   ],
 });

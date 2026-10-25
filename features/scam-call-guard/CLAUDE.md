@@ -8,7 +8,8 @@ While the patient is on a phone call, the phone transcribes it and streams text 
 (gift cards, wire/crypto, IRS/Medicare/SSA, "grandchild in trouble", remote access, secrecy, urgency, reading out numbers)
 plus an AI check decide a warning level. The patient sees FIXED copy; the primary caregiver gets an alert and an AI
 overview. Circle members have NO access. Includes a proof-of-concept UI (`ui/`): a patient "Phone call" card (one Start/Stop
-recording button, browser speech-to-text, typed fallback where the browser cannot listen) and a caregiver call card. Native
+recording button, browser speech-to-text, typed fallback where the browser cannot listen) and a caregiver call card (only calls you
+have not marked yet; renders nothing when there are none, and reports to the dashboard status line via `useAttention`). Native
 on-device speech-to-text is a later step.
 
 ## Public interface

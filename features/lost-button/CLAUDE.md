@@ -50,7 +50,7 @@ try `demo:daughter` (403: circle members cannot see or act on lost alerts). Run 
   says "told" when a push was delivered; never a name, place, number or code.
 - Caregiver widget (order 1, renders nothing until an alert is open): urgent card with press time, whether the phone was notified, the
   last-seen line (absolute time + accuracy, never "now"), "Open in Maps" (user-initiated link), "I'm on my way", and "They are safe"
-  (tap twice; the armed state expires after 5 s).
+  (tap twice; the armed state expires after 5 s). It reports an open alert (urgent) or a failed check to the dashboard status line via `useAttention`.
 - `ui/useActive.ts` polls every 5 s while no alert is open (that caregiver call reads no location) and every 30 s while one is open
   (each call then reads and audit-logs the location). It keeps the last data while reloading (the shared `usePoll` clears it).
 - The route inputs are strict empty objects: the client must send `{}` as the body, not no body.
