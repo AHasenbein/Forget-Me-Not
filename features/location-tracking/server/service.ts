@@ -11,7 +11,7 @@ import type { readingSchema } from './schema';
 import type { LocationStore, StoredReading } from './store';
 
 /** Who may read this patient's location through the contract. Empty by default (fail closed). */
-export type AccessCheck = (requesterId: string, patientId: string) => boolean;
+export type AccessCheck = (requesterId: string, patientId: string) => boolean | Promise<boolean>;
 
 export interface ServiceDeps {
   store: LocationStore;
@@ -82,12 +82,8 @@ export function createLocationService({
 
   const contract: LocationReadContract = {
     async getLastKnown(req) {
-      return read(
-        req.patientId,
-        req.requesterId,
-        req.purpose,
-        canRead(req.requesterId, req.patientId),
-      );
+      const allowed = await canRead(req.requesterId, req.patientId);
+      return read(req.patientId, req.requesterId, req.purpose, allowed);
     },
     // Native region monitoring and debouncing arrive in a later PR; this only remembers the specs.
     async registerGeofence(spec) {

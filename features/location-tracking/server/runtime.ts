@@ -1,4 +1,8 @@
-import { createLocationService, type LocationService } from './service';
+import { supabaseAuthPorts } from '@core/auth/supabase-verifier';
+import { isDemo } from '@core/config/data-mode';
+import { serviceClient } from '@core/db';
+import { profileAccess } from './access';
+import { createLocationService, type AccessCheck, type LocationService } from './service';
 import { createMemoryStore, type LocationStore } from './store';
 
 /**
@@ -13,12 +17,13 @@ interface Runtime {
 
 function build(now: () => Date): Runtime {
   const store = createMemoryStore();
-  const readers = new Set<string>(); // key: `${requesterId}:${patientId}`
-  const service = createLocationService({
-    store,
-    now,
-    canRead: (requesterId, patientId) => readers.has(`${requesterId}:${patientId}`),
-  });
+  const readers = new Set<string>(); // key: `${requesterId}:${patientId}`; demo only (filled by demoSeed)
+  // Contract reads (lost-button, ...): demo = the seeded demo household; live = the requester's profiles row.
+  // The client is created inside the lookup, so a missing key is a denial too (fail closed), never a crash.
+  const live = profileAccess((id) => supabaseAuthPorts(serviceClient()).profileFor(id));
+  const canRead: AccessCheck = (requesterId, patientId) =>
+    isDemo() ? readers.has(`${requesterId}:${patientId}`) : live(requesterId, patientId);
+  const service = createLocationService({ store, now, canRead });
   return { store, service, readers };
 }
 

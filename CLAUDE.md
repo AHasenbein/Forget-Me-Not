@@ -89,6 +89,8 @@ tests/             architecture/ (boundary, route-auth), smoke/, e2e/, integrati
 - Tests ALWAYS run in demo mode with `core/testing` mocks. Live is only exercised manually / in explicit live tests.
 - Features get ports from `getProviders()` (ai, plaid, notifier, location, verifier); **never import a concrete adapter or
   hardcode `if (demo)` branches in feature logic**. Live adapters are registered once via `registerLive()`.
+  A feature that OWNS a port's data (only `location`: location-tracking) provides it from its manifest `register()` via
+  `provideOwned` (`core/providers/owned.ts`); getProviders then serves it in demo and live.
 - **Every feature with user-visible data MUST ship `demoSeed` in its manifest** (canned data built from `DemoWorld`,
   idempotent) and work in demo mode end-to-end. Share data across features only through `core/demo/world.ts`; otherwise
   keep it in `features/<name>/demo/`. Canned data is fictional: no real names, numbers, addresses, or documents.

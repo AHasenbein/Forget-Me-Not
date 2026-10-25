@@ -1,8 +1,10 @@
 import { dataMode, type Service } from '../config/data-mode';
 import { buildDemoWorld, demoProviders, type DemoWorld } from '../demo';
+import { OWNED_PORTS, ownedPort, type OwnedPort } from './owned';
 import type { Providers } from './types';
 
 export type { BankTransaction, PlaidPort, Providers } from './types';
+export { provideOwned, type OwnedPort } from './owned';
 
 /**
  * Live adapters register here in Stage 2 (one line each, in the feature or core module that owns them):
@@ -32,6 +34,13 @@ export function getProviders(
   const demo = demoProviders(world);
   const out = {} as Providers;
   for (const key of Object.keys(SERVICE_OF) as (keyof Providers)[]) {
+    // A feature that owns this data (e.g. location-tracking) serves it in both modes; see owned.ts.
+    const isOwned = (OWNED_PORTS as readonly string[]).includes(key);
+    const fromOwner = isOwned ? ownedPort(key as OwnedPort) : undefined;
+    if (fromOwner) {
+      (out as unknown as Record<string, unknown>)[key] = fromOwner;
+      continue;
+    }
     const mode = dataMode(SERVICE_OF[key], opts.env);
     if (mode === 'demo') (out as unknown as Record<string, unknown>)[key] = demo[key];
     else {

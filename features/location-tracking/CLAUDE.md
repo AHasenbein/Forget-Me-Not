@@ -22,9 +22,13 @@ Routes (`/api/location-tracking`):
   Sessions live in memory and end by the server clock.
 - `GET /views` (primary_caregiver): audit log of who viewed the location and when (no coordinates).
 
-Contract: implements `LocationReadContract` (`server/service.ts`, `createLocationService`). Not yet registered
-with `registerLive('location', ...)`: that is a separate `chore/core/` PR. **Until then `getProviders().location` (what
-lost-button reads) is the demo mock in every mode: the "I'm lost" alert shows the canned park position, not the device's.**
+Contract: implements `LocationReadContract` (`server/service.ts`, `createLocationService`). The manifest's `register()`
+provides it as the owned `location` port (`port.ts`, lazy; `core/providers/owned.ts`), so `getProviders().location`
+(lost-button, later friends-family) reads the real device readings in demo AND live (lost-button itself is demo-only
+until it has a live store). Flag off = not registered.
+Contract access: demo = the seeded household (`readers`); live = the requester's own `profiles` row, read fresh on each
+call (`server/access.ts`: same patient, and primary caregiver / circle member with `view_location` / the patient;
+any lookup error denies). Contract reads are audited like route reads, so lost-button views show in "who looked".
 
 ## Data owned
 
