@@ -1,17 +1,35 @@
 import { useEffect, useState } from 'react';
-import { Text } from 'react-native';
+import { View } from 'react-native';
 import { ApiError } from '@core/client/api';
 import { formatTime } from '@core/client/format';
 import { usePoll } from '@core/client/hooks';
 import { useSession } from '@core/client/session';
-import { AppText, BigButton, Card, Stack } from '@core/design-system/components';
+import {
+  AppText,
+  BigButton,
+  Card,
+  Hero,
+  IconCircle,
+  ProgressDots,
+} from '@core/design-system/components';
+import type { IconName } from '@core/design-system/tokens';
 import type { VisionFrame } from '@core/ai/vision';
-import { checkError, KIND, patientError, pickPatientFocus, type TodayResponse } from './model';
+import {
+  checkError,
+  dateLabelFor,
+  greetingFor,
+  KIND,
+  patientError,
+  pickPatientFocus,
+  type TodayResponse,
+} from './model';
 import { PillCamera } from './PillCamera';
 
 const BASE = '/api/reminders';
-const Emoji = ({ children }: { children: string }) => (
-  <Text style={{ fontSize: 72, textAlign: 'center' }}>{children}</Text>
+const Pic = ({ icon }: { icon: IconName }) => (
+  <View style={{ alignItems: 'center' }}>
+    <IconCircle icon={icon} size={140} tone="primary" />
+  </View>
 );
 
 /** Patient view: ONE card, ONE primary button. Plain words, no codes. */
@@ -89,7 +107,7 @@ export function PatientReminders() {
     const k = KIND[o.kind];
     card = (
       <Card tone="warn">
-        <Emoji>{k.emoji}</Emoji>
+        <Pic icon={k.icon} />
         <AppText variant="huge" center>
           {k.task}
         </AppText>
@@ -113,8 +131,7 @@ export function PatientReminders() {
         ) : null}
         {focus.others.length ? (
           <AppText variant="small" tone="muted" center>
-            Also waiting:{' '}
-            {focus.others.map((x) => `${KIND[x.kind].emoji} ${KIND[x.kind].label}`).join(', ')}
+            Also waiting: {focus.others.map((x) => KIND[x.kind].label).join(', ')}
           </AppText>
         ) : null}
       </Card>
@@ -123,7 +140,7 @@ export function PatientReminders() {
     const o = focus.occurrence;
     card = (
       <Card tone="neutral">
-        <Emoji>{KIND[o.kind].emoji}</Emoji>
+        <Pic icon={KIND[o.kind].icon} />
         <AppText variant="title" center>
           That’s okay. Your caregiver has been told.
         </AppText>
@@ -141,7 +158,7 @@ export function PatientReminders() {
   } else if (focus.kind === 'done') {
     card = (
       <Card tone="success">
-        <Emoji>✅</Emoji>
+        <Pic icon="check" />
         <AppText variant="huge" center tone="success">
           All done. Thank you!
         </AppText>
@@ -150,14 +167,13 @@ export function PatientReminders() {
   } else {
     card = (
       <Card>
-        <Emoji>🌼</Emoji>
+        <Pic icon="flower" />
         <AppText variant="title" center>
           Nothing to do right now
         </AppText>
         {focus.next ? (
           <AppText center tone="muted">
-            Next: {KIND[focus.next.kind].emoji} {KIND[focus.next.kind].label} at{' '}
-            {at(focus.next.dueAt, focus.next.timeZone)}
+            Next: {KIND[focus.next.kind].label} at {at(focus.next.dueAt, focus.next.timeZone)}
           </AppText>
         ) : (
           <AppText center tone="muted">
@@ -184,7 +200,7 @@ export function PatientReminders() {
       />
     ) : (
       <Card tone="success">
-        <Emoji>✅</Emoji>
+        <Pic icon="check" />
         <AppText variant="huge" center tone="success">
           Thank you!
         </AppText>
@@ -197,8 +213,19 @@ export function PatientReminders() {
     );
   }
 
+  const total = items.filter((o) => o.phase !== 'skipped').length;
+  const doneCount = items.filter((o) => o.phase === 'confirmed').length;
   return (
-    <Stack>
+    <View style={{ width: '100%', maxWidth: 640, alignSelf: 'center', gap: 20 }}>
+      <Hero>
+        <View style={{ gap: 4 }}>
+          <AppText variant="huge" tone="inverse">
+            {greetingFor(data.now, items[0]?.timeZone)}
+          </AppText>
+          <AppText tone="inverseMuted">{dateLabelFor(data.now, items[0]?.timeZone)}</AppText>
+        </View>
+        {total > 0 ? <ProgressDots inverse done={doneCount} total={total} /> : null}
+      </Hero>
       {card}
       {note ? (
         <Card>
@@ -211,6 +238,6 @@ export function PatientReminders() {
         </Card>
       ) : null}
       {stale}
-    </Stack>
+    </View>
   );
 }
