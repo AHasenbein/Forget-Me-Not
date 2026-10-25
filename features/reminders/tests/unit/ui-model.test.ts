@@ -1,6 +1,11 @@
 import { describe, expect, it } from 'vitest';
 import type { Phase } from '../../service';
 import {
+  adherencePercent,
+  auditLabel,
+  nextUp,
+  untilLabel,
+  weekStrip,
   caregiverCounts,
   caregiverError,
   caregiverRows,
@@ -189,5 +194,40 @@ describe('greetingFor / dateLabelFor (server time, not device time)', () => {
   });
   it('shows the weekday and date', () => {
     expect(dateLabelFor('2026-06-02T08:00:00Z', 'UTC')).toBe('Tuesday, June 2');
+  });
+});
+
+describe('caregiver insights', () => {
+  it('untilLabel counts from the server now', () => {
+    expect(untilLabel('2026-06-02T08:00:00Z', '2026-06-02T08:25:00Z')).toBe('in 25 min');
+    expect(untilLabel('2026-06-02T08:00:00Z', '2026-06-02T10:05:00Z')).toBe('in 2 h 5 min');
+    expect(untilLabel('2026-06-02T08:00:00Z', '2026-06-02T11:00:00Z')).toBe('in 3 h');
+    expect(untilLabel('2026-06-02T08:00:00Z', '2026-06-02T07:59:00Z')).toBe('now');
+  });
+  it('adherencePercent ignores skipped and handles no data', () => {
+    expect(adherencePercent({ confirmed: 0, missed: 0 })).toBeNull();
+    expect(adherencePercent({ confirmed: 3, missed: 1 })).toBe(75);
+  });
+  it('nextUp picks the soonest not-yet-happened reminder', () => {
+    const a = occ('pill', 'upcoming', '2026-06-02T12:00:00Z');
+    const b = occ('shower', 'snoozed', '2026-06-02T10:00:00Z');
+    const c = occ('feed_pets', 'confirmed', '2026-06-02T09:00:00Z');
+    expect(nextUp([a, b, c])?.id).toBe(b.id);
+    expect(nextUp([c])).toBeNull();
+  });
+  it('weekStrip buckets by day in the zone and marks today', () => {
+    const items = [
+      occ('pill', 'confirmed', '2026-06-02T08:00:00Z'),
+      occ('pill', 'missed', '2026-06-01T08:00:00Z'),
+      occ('shower', 'confirmed', '2026-06-01T09:00:00Z'),
+    ];
+    const strip = weekStrip(items, '2026-06-02T12:00:00Z', 'UTC');
+    expect(strip).toHaveLength(7);
+    expect(strip[6]).toMatchObject({ label: 'Tue', done: 1, missed: 0, isToday: true });
+    expect(strip[5]).toMatchObject({ label: 'Mon', done: 1, missed: 1, isToday: false });
+  });
+  it('auditLabel falls back safely', () => {
+    expect(auditLabel('pill_frames_viewed')).toMatch(/viewed/);
+    expect(auditLabel('something_new')).toBe('Activity recorded');
   });
 });

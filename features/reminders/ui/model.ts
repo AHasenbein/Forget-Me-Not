@@ -1,3 +1,4 @@
+import type { IconName } from '@core/design-system/tokens';
 import type { Occurrence, ReminderKind } from '../schemas';
 import type { Phase } from '../service';
 
@@ -6,17 +7,17 @@ export type OccurrenceView = Occurrence & { phase: Phase };
 
 export const KIND: Record<
   ReminderKind,
-  { emoji: string; task: string; label: string; done: string }
+  { icon: IconName; task: string; label: string; done: string }
 > = {
-  pill: { emoji: '💊', task: 'Time to take your pill', label: 'Pill', done: 'I took it' },
+  pill: { icon: 'pill', task: 'Time to take your pill', label: 'Pill', done: 'I took it' },
   brush_teeth: {
-    emoji: '🪥',
+    icon: 'toothbrush',
     task: 'Time to brush your teeth',
     label: 'Brush teeth',
     done: 'I did it',
   },
-  shower: { emoji: '🚿', task: 'Time for your shower', label: 'Shower', done: 'I did it' },
-  feed_pets: { emoji: '🐾', task: 'Time to feed your pets', label: 'Feed pets', done: 'I did it' },
+  shower: { icon: 'shower', task: 'Time for your shower', label: 'Shower', done: 'I did it' },
+  feed_pets: { icon: 'paw', task: 'Time to feed your pets', label: 'Feed pets', done: 'I did it' },
 };
 
 export type PatientFocus =
@@ -231,3 +232,70 @@ export function dateLabelFor(nowIso: string, timeZone?: string): string {
     return new Intl.DateTimeFormat('en-US', opts).format(new Date(nowIso));
   }
 }
+
+/** "in 25 min" / "in 2 h 5 min" / "now" between the server's now and a due time. */
+export function untilLabel(nowIso: string, dueIso: string): string {
+  const mins = Math.round((new Date(dueIso).getTime() - new Date(nowIso).getTime()) / 60_000);
+  if (mins <= 0) return 'now';
+  if (mins < 60) return `in ${mins} min`;
+  const h = Math.floor(mins / 60);
+  const m = mins % 60;
+  return m ? `in ${h} h ${m} min` : `in ${h} h`;
+}
+
+/** The soonest reminder that has not happened yet (upcoming or snoozed). */
+export function nextUp(items: readonly OccurrenceView[]): OccurrenceView | null {
+  return (
+    [...items].filter((o) => o.phase === 'upcoming' || o.phase === 'snoozed').sort(byDue)[0] ?? null
+  );
+}
+
+/** Share of reminders taken, as a whole percent. Skipped ones do not count either way. null = no data yet. */
+export function adherencePercent(s: { confirmed: number; missed: number }): number | null {
+  const total = s.confirmed + s.missed;
+  return total === 0 ? null : Math.round((s.confirmed / total) * 100);
+}
+
+export interface DayBar {
+  key: string;
+  label: string;
+  done: number;
+  missed: number;
+  isToday: boolean;
+}
+
+/** Last 7 days (oldest first), counted in the given zone, for the adherence strip. */
+export function weekStrip(
+  items: readonly OccurrenceView[],
+  nowIso: string,
+  timeZone?: string,
+): DayBar[] {
+  const key = (d: Date) =>
+    new Intl.DateTimeFormat('en-CA', {
+      timeZone,
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit',
+    }).format(d);
+  const label = (d: Date) =>
+    new Intl.DateTimeFormat('en-US', { timeZone, weekday: 'short' }).format(d);
+  const now = new Date(nowIso);
+  const days = Array.from({ length: 7 }, (_, i) => new Date(now.getTime() - (6 - i) * 86_400_000));
+  return days.map((d, i) => {
+    const k = key(d);
+    const mine = items.filter((o) => key(new Date(o.dueAt)) === k);
+    return {
+      key: k,
+      label: label(d),
+      done: mine.filter((o) => o.phase === 'confirmed').length,
+      missed: mine.filter((o) => o.phase === 'missed' || o.phase === 'overdue').length,
+      isToday: i === 6,
+    };
+  });
+}
+
+export const AUDIT_LABEL: Record<string, string> = {
+  pill_frames_viewed: 'Pill photos were viewed',
+  pill_check_reviewed: 'A pill photo check was reviewed',
+};
+export const auditLabel = (action: string) => AUDIT_LABEL[action] ?? 'Activity recorded';

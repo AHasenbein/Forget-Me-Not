@@ -1,6 +1,17 @@
 import { useRef, useState, type ReactNode } from 'react';
-import { Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
-import { palette, patientUi, radius, shadow, type Tone } from './tokens';
+import { Image, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import icon_pill from './icons/pill.png';
+import icon_toothbrush from './icons/toothbrush.png';
+import icon_shower from './icons/shower.png';
+import icon_paw from './icons/paw.png';
+import icon_home from './icons/home.png';
+import icon_sliders from './icons/sliders.png';
+import icon_check from './icons/check.png';
+import icon_alert from './icons/alert.png';
+import icon_back from './icons/back.png';
+import icon_camera from './icons/camera.png';
+import icon_flower from './icons/flower.png';
+import { palette, patientUi, radius, shadow, type IconName, type Tone } from './tokens';
 
 /** Multiplier from Settings > Text size. Provided by the shell. */
 import { useTextScale } from './text-scale';
@@ -16,14 +27,22 @@ export function AppText({
   children,
 }: {
   variant?: Variant;
-  tone?: Tone | 'muted';
+  tone?: Tone | 'muted' | 'inverse' | 'inverseMuted';
   bold?: boolean;
   center?: boolean;
   children: ReactNode;
 }) {
   const scale = useTextScale();
   const color =
-    tone === 'muted' ? palette.muted : tone && tone !== 'neutral' ? palette[tone] : palette.text;
+    tone === 'inverse'
+      ? '#FFFFFF'
+      : tone === 'inverseMuted'
+        ? '#D4E8DF'
+        : tone === 'muted'
+          ? palette.muted
+          : tone && tone !== 'neutral'
+            ? palette[tone]
+            : palette.text;
   // Headlines stop growing at 1.25x: at 1.5x a 40px title swallows a phone screen.
   const size =
     SIZE[variant] * (variant === 'huge' || variant === 'title' ? Math.min(scale, 1.25) : scale);
@@ -42,14 +61,14 @@ export function AppText({
   );
 }
 
-export function Screen({ children }: { children: ReactNode }) {
+export function Screen({ children, wide }: { children: ReactNode; wide?: boolean }) {
   return (
     <ScrollView
       style={{ backgroundColor: palette.bg }}
       contentContainerStyle={s.screen}
       keyboardShouldPersistTaps="handled"
     >
-      <View style={s.column}>{children}</View>
+      <View style={[s.column, wide && { maxWidth: 1120 }]}>{children}</View>
     </ScrollView>
   );
 }
@@ -68,6 +87,18 @@ const EDGE: Record<Tone, string> = {
   warn: palette.warn,
   danger: palette.danger,
 };
+
+/** Brand hero panel: deep green, soft petals, white text. One per screen, carries the greeting/status. */
+export function Hero({ children }: { children: ReactNode }) {
+  return (
+    <View style={s.hero}>
+      <View style={[s.petal, { width: 220, height: 220, right: -60, top: -80, opacity: 0.22 }]} />
+      <View style={[s.petal, { width: 120, height: 120, right: 70, top: -50, opacity: 0.14 }]} />
+      <View style={[s.sun, { right: 16, top: 16 }]} />
+      <View style={{ gap: 14 }}>{children}</View>
+    </View>
+  );
+}
 
 /** Soft raised surface. Tinted tones get a coloured edge so meaning never relies on colour fill alone. */
 export function Card({ tone = 'neutral', children }: { tone?: Tone; children: ReactNode }) {
@@ -226,13 +257,47 @@ export function Field({
   );
 }
 
+const ICONS: Record<IconName, number> = {
+  pill: icon_pill,
+  toothbrush: icon_toothbrush,
+  shower: icon_shower,
+  paw: icon_paw,
+  home: icon_home,
+  sliders: icon_sliders,
+  check: icon_check,
+  alert: icon_alert,
+  back: icon_back,
+  camera: icon_camera,
+  flower: icon_flower,
+};
+
+/** Line icon image (tinted) or the full-colour brand flower. Decorative: always sits next to a text label. */
+export function Icon({
+  name,
+  size = 24,
+  color = palette.text,
+}: {
+  name: IconName;
+  size?: number;
+  color?: string;
+}) {
+  return (
+    <Image
+      accessibilityElementsHidden
+      importantForAccessibility="no-hide-descendants"
+      source={ICONS[name]}
+      style={[{ width: size, height: size }, name !== 'flower' && { tintColor: color }]}
+    />
+  );
+}
+
 /** A familiar picture in a soft circle. Always sits next to a text label (pictures alone are ambiguous). */
 export function IconCircle({
-  emoji,
+  icon,
   size = 56,
   tone = 'primary',
 }: {
-  emoji: string;
+  icon: IconName;
   size?: number;
   tone?: Tone;
 }) {
@@ -252,7 +317,11 @@ export function IconCircle({
         justifyContent: 'center',
       }}
     >
-      <Text style={{ fontSize: size * 0.5 }}>{emoji}</Text>
+      <Icon
+        name={icon}
+        size={size * 0.52}
+        color={tone === 'neutral' || tone === 'primary' ? palette.primary : palette[tone]}
+      />
     </View>
   );
 }
@@ -296,12 +365,25 @@ export function Segmented<T extends string>({
 }
 
 /** "3 of 5 done" as dots, plain Views (no native deps). */
-export function ProgressDots({ done, total }: { done: number; total: number }) {
+export function ProgressDots({
+  done,
+  total,
+  inverse,
+}: {
+  done: number;
+  total: number;
+  inverse?: boolean;
+}) {
   return (
     <View
       accessible
       accessibilityLabel={`${done} of ${total} done today`}
-      style={{ flexDirection: 'row', gap: 8, justifyContent: 'center', flexWrap: 'wrap' }}
+      style={{
+        flexDirection: 'row',
+        gap: 8,
+        justifyContent: inverse ? 'flex-start' : 'center',
+        flexWrap: 'wrap',
+      }}
     >
       {Array.from({ length: total }, (_, i) => (
         <View
@@ -310,9 +392,16 @@ export function ProgressDots({ done, total }: { done: number; total: number }) {
             width: 16,
             height: 16,
             borderRadius: 8,
-            backgroundColor: i < done ? palette.success : 'transparent',
+            backgroundColor:
+              i < done ? (inverse ? palette.sunflower : palette.success) : 'transparent',
             borderWidth: 2,
-            borderColor: i < done ? palette.success : palette.muted,
+            borderColor: inverse
+              ? i < done
+                ? palette.sunflower
+                : '#D4E8DF'
+              : i < done
+                ? palette.success
+                : palette.muted,
           }}
         />
       ))}
@@ -325,17 +414,35 @@ export function StatTile({
   value,
   label,
   tone = 'neutral',
+  inverse,
 }: {
   value: number;
   label: string;
   tone?: Tone;
+  inverse?: boolean;
 }) {
   const scale = useTextScale();
-  const color = tone === 'neutral' ? palette.text : palette[tone];
+  const color = inverse ? '#FFFFFF' : tone === 'neutral' ? palette.text : palette[tone];
   return (
-    <View style={[s.stat, { backgroundColor: BG[tone], borderColor: EDGE[tone] }]}>
+    <View
+      style={[
+        s.stat,
+        inverse
+          ? {
+              backgroundColor: tone === 'danger' ? palette.danger : palette.heroSoft,
+              borderColor: 'transparent',
+            }
+          : { backgroundColor: BG[tone], borderColor: EDGE[tone] },
+      ]}
+    >
       <Text style={{ fontSize: 34 * scale, fontWeight: '800', color }}>{value}</Text>
-      <Text style={{ fontSize: 16 * scale, color: palette.muted, textAlign: 'center' }}>
+      <Text
+        style={{
+          fontSize: 16 * scale,
+          color: inverse ? '#E6F2EC' : palette.muted,
+          textAlign: 'center',
+        }}
+      >
         {label}
       </Text>
     </View>
@@ -388,6 +495,21 @@ const s = StyleSheet.create({
     fontSize: 22,
     backgroundColor: palette.card,
     color: palette.text,
+  },
+  hero: {
+    backgroundColor: palette.hero,
+    borderRadius: radius.lg,
+    padding: 28,
+    overflow: 'hidden',
+  },
+  petal: { position: 'absolute', borderRadius: 999, backgroundColor: palette.petal },
+  sun: {
+    position: 'absolute',
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: palette.sunflower,
+    opacity: 0.9,
   },
   segment: {
     flexDirection: 'row',

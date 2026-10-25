@@ -1,6 +1,6 @@
 import { Link, usePathname, useRouter } from 'expo-router';
-import { useState } from 'react';
-import { Pressable, Text, View } from 'react-native';
+import { useState, type ReactNode } from 'react';
+import { Pressable, Text, useWindowDimensions, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import {
   AppText,
@@ -8,7 +8,7 @@ import {
   Badge,
   Card,
   Chip,
-  IconCircle,
+  Icon,
   Row,
   Segmented,
   Screen,
@@ -21,7 +21,7 @@ import { SignIn } from './SignIn';
 import { PERSONAS, TEXT_SIZES, useSession } from './session';
 import { widgetsFor } from './widgets';
 
-export function TopBar() {
+export function TopBar({ hideBrand }: { hideBrand?: boolean } = {}) {
   const { demo, persona, setPersona, role } = useSession();
   const path = usePathname();
   const insets = useSafeAreaInsets();
@@ -38,11 +38,11 @@ export function TopBar() {
         alignItems: 'center',
       }}
     >
-      <View style={{ width: '100%', maxWidth: 720, gap: 8 }}>
+      <View style={{ width: '100%', maxWidth: hideBrand ? 1120 : 720, gap: 8 }}>
         <Row gap={8}>
           <View style={{ flex: 1, flexDirection: 'row', alignItems: 'center', gap: 10 }}>
-            <IconCircle emoji="🌼" size={40} />
-            {!patient ? (
+            <Icon name="flower" size={36} />
+            {!patient && !hideBrand ? (
               <Text
                 numberOfLines={1}
                 style={{ fontSize: 18, fontWeight: '700', color: palette.text }}
@@ -71,9 +71,12 @@ export function TopBar() {
                   paddingHorizontal: 16,
                 }}
               >
-                <Text style={{ fontSize: 24, fontWeight: '700', color: palette.text }}>
-                  {onSettings ? '← Back' : '⚙️ Settings'}
-                </Text>
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                  <Icon name={onSettings ? 'back' : 'sliders'} size={26} />
+                  <Text style={{ fontSize: 24, fontWeight: '700', color: palette.text }}>
+                    {onSettings ? 'Back' : 'Settings'}
+                  </Text>
+                </View>
               </Pressable>
             </Link>
           ) : null}
@@ -91,8 +94,8 @@ export function TopBar() {
 }
 
 const NAV = [
-  { href: '/', label: 'Home', emoji: '🏠' },
-  { href: '/settings', label: 'Settings', emoji: '⚙️' },
+  { href: '/', label: 'Home', icon: 'home' },
+  { href: '/settings', label: 'Settings', icon: 'sliders' },
 ] as const;
 
 /** Caregiver bottom bar: two big labelled destinations, always visible, never hidden off-screen. */
@@ -100,7 +103,8 @@ export function BottomNav() {
   const { role, liveStatus } = useSession();
   const path = usePathname();
   const insets = useSafeAreaInsets();
-  if (role !== 'primary_caregiver' || liveStatus !== 'ready') return null;
+  const wide = useWindowDimensions().width >= 900;
+  if (role !== 'primary_caregiver' || liveStatus !== 'ready' || wide) return null;
   return (
     <View
       accessibilityRole="tablist"
@@ -131,7 +135,7 @@ export function BottomNav() {
                   alignItems: 'center',
                 }}
               >
-                <Text style={{ fontSize: 22 }}>{n.emoji}</Text>
+                <Icon name={n.icon} size={26} color={on ? palette.primary : palette.muted} />
                 <Text
                   style={{
                     fontSize: 16,
@@ -146,6 +150,69 @@ export function BottomNav() {
           </Link>
         );
       })}
+    </View>
+  );
+}
+
+/** Desktop/tablet: caregiver navigation moves to a left sidebar and the content gets the full width. */
+function Sidebar() {
+  const path = usePathname();
+  return (
+    <View
+      style={{
+        width: 240,
+        backgroundColor: palette.hero,
+        padding: 20,
+        paddingTop: 28,
+        gap: 8,
+      }}
+    >
+      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10, marginBottom: 24 }}>
+        <Icon name="flower" size={40} />
+        <Text style={{ fontSize: 20, fontWeight: '800', color: '#FFFFFF', flex: 1 }}>
+          Forget Me Not
+        </Text>
+      </View>
+      {NAV.map((n) => {
+        const on = n.href === '/' ? path === '/' : path.startsWith(n.href);
+        return (
+          <Link key={n.href} href={n.href} asChild>
+            <Pressable
+              accessibilityRole="link"
+              accessibilityState={{ selected: on }}
+              style={{
+                minHeight: 56,
+                flexDirection: 'row',
+                alignItems: 'center',
+                gap: 14,
+                paddingHorizontal: 16,
+                borderRadius: 16,
+                backgroundColor: on ? 'rgba(255,255,255,0.16)' : 'transparent',
+              }}
+            >
+              <Icon name={n.icon} size={26} color="#FFFFFF" />
+              <Text style={{ fontSize: 20, fontWeight: '700', color: '#FFFFFF' }}>{n.label}</Text>
+            </Pressable>
+          </Link>
+        );
+      })}
+    </View>
+  );
+}
+
+/** Root frame: optional sidebar on wide screens, then top bar, page and (narrow) bottom bar. */
+export function AppFrame({ children }: { children: ReactNode }) {
+  const { role, liveStatus } = useSession();
+  const wide = useWindowDimensions().width >= 900;
+  const side = wide && role === 'primary_caregiver' && liveStatus === 'ready';
+  return (
+    <View style={{ flex: 1, flexDirection: 'row', backgroundColor: palette.bg }}>
+      {side ? <Sidebar /> : null}
+      <View style={{ flex: 1 }}>
+        <TopBar hideBrand={side} />
+        {children}
+        <BottomNav />
+      </View>
     </View>
   );
 }
@@ -193,7 +260,7 @@ export function Home() {
     return (
       <Screen>
         <Card>
-          <AppText variant="title">Hello 👋</AppText>
+          <AppText variant="title">Hello</AppText>
           <AppText>
             There’s nothing for you here yet. Check-ins and sharing are coming soon.
           </AppText>
@@ -202,7 +269,7 @@ export function Home() {
     );
   // The date and greeting come from the widgets (they use the server's `now`, not the device clock).
   return (
-    <Screen>
+    <Screen wide={role === 'primary_caregiver'}>
       <Widgets />
     </Screen>
   );

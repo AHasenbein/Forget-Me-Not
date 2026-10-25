@@ -18,6 +18,10 @@ export const palette = {
   border: '#D9D3C5',
   sunken: '#EFEBDF',
   track: '#E9E4D6',
+  hero: '#0B3F31',
+  heroSoft: 'rgba(255,255,255,0.14)',
+  sunflower: '#FFC83D',
+  petal: '#9DB4F0',
   inputBorder: '#6B7772',
   borderStrong: '#16201C',
   primary: '#0F5B45',
@@ -39,3 +43,17 @@ export const shadow = {
   boxShadow: '0 2px 10px rgba(22, 32, 28, 0.08)',
   elevation: 2,
 } as const;
+
+/** Names of the bundled icon images (core/design-system/icons/*.png). */
+export type IconName =
+  | 'pill'
+  | 'toothbrush'
+  | 'shower'
+  | 'paw'
+  | 'home'
+  | 'sliders'
+  | 'check'
+  | 'alert'
+  | 'back'
+  | 'camera'
+  | 'flower';

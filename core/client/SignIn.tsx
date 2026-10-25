@@ -101,7 +101,7 @@ export function SignIn() {
   return (
     <Screen>
       <Stack gap={12}>
-        <IconCircle emoji="🌼" size={88} />
+        <IconCircle icon="flower" size={88} />
         <AppText variant="huge">{quickLogin ? 'Who are you?' : 'Welcome back'}</AppText>
         <AppText tone="muted">
           {quickLogin ? 'Tap one to continue.' : 'Sign in to see your day.'}

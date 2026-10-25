@@ -35,7 +35,8 @@
       "package": "app.forgetmenot"
     },
     "web": {
-      "bundler": "metro"
+      "bundler": "metro",
+      "favicon": "./core/design-system/icons/flower.png"
     }
   }
 }

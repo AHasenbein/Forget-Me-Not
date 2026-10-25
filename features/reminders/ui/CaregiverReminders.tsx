@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Image, StyleSheet, View } from 'react-native';
+import { Image, StyleSheet, useWindowDimensions, View } from 'react-native';
 import { ApiError } from '@core/client/api';
 import { daysLabel, formatTime } from '@core/client/format';
 import { usePoll } from '@core/client/hooks';
@@ -11,6 +11,7 @@ import {
   Card,
   Chip,
   Field,
+  Hero,
   IconCircle,
   Row,
   Segmented,
@@ -25,7 +26,13 @@ import {
   caregiverError,
   caregiverRows,
   type CaregiverRow,
+  adherencePercent,
+  auditLabel,
   dateLabelFor,
+  type DayBar,
+  nextUp,
+  untilLabel,
+  weekStrip,
   KIND,
   normalizeTime,
   type OccurrenceView,
@@ -36,7 +43,13 @@ const BASE = '/api/reminders';
 interface PhotoSet {
   frames: { mediaType: string; data: string }[];
 }
+interface AuditRow {
+  id: string;
+  at: string;
+  action: string;
+}
 interface History {
+  occurrences: OccurrenceView[];
   days: number;
   summary: { confirmed: number; missed: number; skipped: number };
 }
@@ -45,6 +58,7 @@ export function CaregiverReminders() {
   const { api, token } = useSession();
   const today = usePoll(() => api<TodayResponse>('GET', `${BASE}/today`), 2000, [token]);
   const schedules = usePoll(() => api<Schedule[]>('GET', `${BASE}/schedules`), 4000, [token]);
+  const audit = usePoll(() => api<AuditRow[]>('GET', `${BASE}/audit`), 10000, [token]);
   const history = usePoll(() => api<History>('GET', `${BASE}/history?days=7`), 8000, [token]);
   const [problem, setProblem] = useState('');
   const [busyId, setBusyId] = useState<string | null>(null);
@@ -58,6 +72,7 @@ export function CaregiverReminders() {
     today.reload();
     schedules.reload();
     history.reload();
+    audit.reload();
   };
   const call = async (id: string, method: string, path: string, body?: unknown) => {
     if (busyId) return;
@@ -103,50 +118,67 @@ export function CaregiverReminders() {
     });
   };
 
+  const nextItem = nextUp(today.data?.occurrences ?? []);
+  const week = history.data
+    ? weekStrip(history.data.occurrences, today.data?.now ?? new Date().toISOString(), tz)
+    : null;
+  const pct = history.data ? adherencePercent(history.data.summary) : null;
+  const wide = useWindowDimensions().width >= 1000;
   const allClear = !today.error && counts.attention === 0 && reviews.length === 0;
 
-  return (
-    <Stack>
-      <Stack gap={4}>
-        <AppText variant="huge">Today</AppText>
-        <AppText tone="muted">{today.data ? dateLabelFor(today.data.now, tz) : ' '}</AppText>
-      </Stack>
-
-      {today.error && !today.data ? (
-        <Card tone="danger">
-          <AppText>{caregiverError(today.error.code)}</AppText>
-        </Card>
-      ) : (
-        <Card tone={allClear ? 'success' : 'warn'}>
-          <Row gap={14}>
-            <IconCircle
-              emoji={allClear ? '✅' : '⚠️'}
-              size={64}
-              tone={allClear ? 'success' : 'warn'}
-            />
-            <View style={{ flex: 1, minWidth: 200 }}>
-              <AppText variant="title" tone={allClear ? 'success' : 'warn'}>
-                {allClear ? 'All on track' : `${counts.attention + reviews.length} to look at`}
-              </AppText>
-              <AppText variant="small" tone="muted">
-                {history.data
-                  ? `Last ${history.data.days} days: ${history.data.summary.confirmed} done, ${history.data.summary.missed} missed, ${history.data.summary.skipped} skipped`
-                  : 'Checking in…'}
-              </AppText>
-            </View>
-          </Row>
-          <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 10 }}>
-            <StatTile value={counts.done} label="done" tone="success" />
-            <StatTile value={counts.upcoming} label="coming up" />
-            <StatTile
-              value={counts.attention}
-              label="need attention"
-              tone={counts.attention ? 'danger' : 'neutral'}
-            />
+  const heroEl =
+    today.error && !today.data ? (
+      <Card tone="danger">
+        <AppText>{caregiverError(today.error.code)}</AppText>
+      </Card>
+    ) : (
+      <Hero>
+        <View style={{ gap: 2 }}>
+          <AppText variant="small" tone="inverseMuted">
+            {today.data ? dateLabelFor(today.data.now, tz) : ' '}
+          </AppText>
+          <AppText variant="huge" tone="inverse">
+            Today
+          </AppText>
+        </View>
+        <Row gap={14}>
+          <IconCircle
+            icon={allClear ? 'check' : 'alert'}
+            size={60}
+            tone={allClear ? 'success' : 'warn'}
+          />
+          <View style={{ flex: 1, minWidth: 200 }}>
+            <AppText variant="title" tone="inverse">
+              {allClear ? 'All on track' : `${counts.attention + reviews.length} to look at`}
+            </AppText>
+            <AppText variant="small" tone="inverseMuted">
+              {history.data
+                ? `Last ${history.data.days} days: ${history.data.summary.confirmed} done, ${history.data.summary.missed} missed, ${history.data.summary.skipped} skipped`
+                : 'Checking in…'}
+            </AppText>
           </View>
-        </Card>
-      )}
-
+        </Row>
+        {nextItem && today.data ? (
+          <AppText variant="small" tone="inverseMuted">
+            Next: {KIND[nextItem.kind].label} {untilLabel(today.data.now, nextItem.dueAt)} (
+            {formatTime(nextItem.dueAt, nextItem.timeZone)})
+          </AppText>
+        ) : null}
+        <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 10 }}>
+          <StatTile inverse value={counts.done} label="done" />
+          <StatTile inverse value={counts.upcoming} label="coming up" />
+          <StatTile
+            inverse
+            value={counts.attention}
+            label="need attention"
+            tone={counts.attention ? 'danger' : 'neutral'}
+          />
+        </View>
+      </Hero>
+    );
+  const weekEl = week ? <WeekCard week={week} pct={pct} /> : null;
+  const alerts = (
+    <>
       {reviews.map((r) => (
         <ReviewCard
           key={r.occurrence.id}
@@ -161,7 +193,7 @@ export function CaregiverReminders() {
       {attention.map((r) => (
         <Card key={r.occurrence.id} tone="danger">
           <Row gap={14}>
-            <IconCircle emoji={KIND[r.occurrence.kind].emoji} size={56} tone="danger" />
+            <IconCircle icon={KIND[r.occurrence.kind].icon} size={56} tone="danger" />
             <View style={{ flex: 1, minWidth: 180 }}>
               <AppText variant="title" tone="danger">
                 {KIND[r.occurrence.kind].label} missed
@@ -186,7 +218,10 @@ export function CaregiverReminders() {
           />
         </Card>
       ))}
-
+    </>
+  );
+  const main = (
+    <>
       <Segmented options={SECTIONS} value={section} onChange={setSection} />
 
       {section === 'today' ? (
@@ -194,9 +229,14 @@ export function CaregiverReminders() {
           {rows.length === 0 ? <AppText tone="muted">Nothing scheduled for today.</AppText> : null}
           {rows.map((r, i) => (
             <View key={r.occurrence.id} style={[styles.rowItem, i > 0 && styles.rowDivider]}>
-              <IconCircle emoji={KIND[r.occurrence.kind].emoji} size={48} tone={r.tone} />
+              <IconCircle icon={KIND[r.occurrence.kind].icon} size={48} tone={r.tone} />
               <View style={{ flex: 1, minWidth: 140, gap: 6 }}>
                 <AppText bold>{KIND[r.occurrence.kind].label}</AppText>
+                {r.occurrence.snoozeCount ? (
+                  <AppText variant="small" tone="muted">
+                    Snoozed {r.occurrence.snoozeCount}×
+                  </AppText>
+                ) : null}
                 <Row gap={6}>
                   <Badge label={r.status} tone={r.tone} />
                   {r.check ? <Badge label={r.check.label} tone={r.check.tone} /> : null}
@@ -216,7 +256,7 @@ export function CaregiverReminders() {
           {list.map((s, i) => (
             <View key={s.id} style={[{ gap: 10 }, i > 0 && styles.rowDivider]}>
               <View style={styles.rowItem}>
-                <IconCircle emoji={KIND[s.kind].emoji} size={48} />
+                <IconCircle icon={KIND[s.kind].icon} size={48} />
                 <View style={{ flex: 1, minWidth: 140 }}>
                   <AppText bold>
                     {KIND[s.kind].label} · {formatTime(`2026-01-01T${s.localTime}:00Z`, 'UTC')}
@@ -249,6 +289,29 @@ export function CaregiverReminders() {
         </Card>
       ) : null}
 
+      {section === 'activity' ? (
+        <Card>
+          <AppText variant="title">Activity log</AppText>
+          <AppText variant="small" tone="muted">
+            Sensitive actions are recorded here so you can always see who looked at what.
+          </AppText>
+          {(audit.data ?? []).length === 0 ? (
+            <AppText tone="muted">Nothing has been recorded yet.</AppText>
+          ) : null}
+          {(audit.data ?? []).map((a, i) => (
+            <View key={a.id} style={[styles.rowItem, i > 0 && styles.rowDivider]}>
+              <IconCircle icon={a.action === 'pill_frames_viewed' ? 'camera' : 'check'} size={44} />
+              <View style={{ flex: 1, minWidth: 140 }}>
+                <AppText>{auditLabel(a.action)}</AppText>
+                <AppText variant="small" tone="muted">
+                  {formatTime(a.at)}
+                </AppText>
+              </View>
+            </View>
+          ))}
+        </Card>
+      ) : null}
+
       {section === 'add' ? (
         <Card>
           <AppText variant="title">Add a reminder</AppText>
@@ -256,7 +319,7 @@ export function CaregiverReminders() {
             {REMINDER_KINDS.map((k) => (
               <Chip
                 key={k}
-                label={`${KIND[k].emoji} ${KIND[k].label}`}
+                label={KIND[k].label}
                 selected={k === kind}
                 onPress={() => setKind(k)}
               />
@@ -294,6 +357,26 @@ export function CaregiverReminders() {
           <AppText>{problem}</AppText>
         </Card>
       ) : null}
+    </>
+  );
+
+  return wide ? (
+    <View style={{ gap: 20 }}>
+      {heroEl}
+      <View style={{ flexDirection: 'row', gap: 20, alignItems: 'flex-start' }}>
+        <View style={{ flex: 1, gap: 20 }}>
+          {alerts}
+          {weekEl}
+        </View>
+        <View style={{ flex: 1.3, gap: 20 }}>{main}</View>
+      </View>
+    </View>
+  ) : (
+    <Stack>
+      {heroEl}
+      {alerts}
+      {weekEl}
+      {main}
     </Stack>
   );
 }
@@ -301,7 +384,8 @@ export function CaregiverReminders() {
 const SECTIONS = [
   { id: 'today', label: 'Today' },
   { id: 'schedules', label: 'Schedules' },
-  { id: 'add', label: 'Add new' },
+  { id: 'activity', label: 'Activity' },
+  { id: 'add', label: 'Add' },
 ] as const;
 type Section = (typeof SECTIONS)[number]['id'];
 
@@ -309,6 +393,61 @@ const styles = StyleSheet.create({
   rowItem: { flexDirection: 'row', alignItems: 'center', gap: 14, flexWrap: 'wrap' },
   rowDivider: { borderTopWidth: 1, borderTopColor: palette.border, paddingTop: 16 },
 });
+
+function WeekCard({ week, pct }: { week: DayBar[]; pct: number | null }) {
+  const max = Math.max(1, ...week.map((d) => d.done + d.missed));
+  const H = 84;
+  return (
+    <Card>
+      <Row gap={12}>
+        <View style={{ flex: 1, minWidth: 160 }}>
+          <AppText variant="title">This week</AppText>
+          <AppText variant="small" tone="muted">
+            Reminders taken over the last 7 days
+          </AppText>
+        </View>
+        <AppText
+          variant={pct === null ? 'small' : 'huge'}
+          tone={pct !== null && pct < 70 ? 'warn' : 'primary'}
+        >
+          {pct === null ? 'No data yet' : `${pct}%`}
+        </AppText>
+      </Row>
+      <View style={{ flexDirection: 'row', alignItems: 'flex-end', gap: 8 }}>
+        {week.map((d) => (
+          <View key={d.key} style={{ flex: 1, alignItems: 'center', gap: 6 }}>
+            <View
+              accessible
+              accessibilityLabel={`${d.label}: ${d.done} done, ${d.missed} missed`}
+              style={{
+                width: '100%',
+                height: H,
+                justifyContent: 'flex-end',
+                borderRadius: 10,
+                backgroundColor: palette.sunken,
+                overflow: 'hidden',
+              }}
+            >
+              {d.missed ? (
+                <View style={{ height: (d.missed / max) * H, backgroundColor: palette.danger }} />
+              ) : null}
+              {d.done ? (
+                <View style={{ height: (d.done / max) * H, backgroundColor: palette.success }} />
+              ) : null}
+            </View>
+            <AppText variant="small" bold={d.isToday} tone={d.isToday ? 'primary' : 'muted'}>
+              {d.label}
+            </AppText>
+          </View>
+        ))}
+      </View>
+      <Row gap={12}>
+        <Badge label="Done" tone="success" />
+        <Badge label="Missed" tone="danger" />
+      </Row>
+    </Card>
+  );
+}
 
 function ReviewCard({
   row,
@@ -327,7 +466,7 @@ function ReviewCard({
   return (
     <Card tone={wrong ? 'danger' : 'warn'}>
       <AppText variant="title" tone={wrong ? 'danger' : 'warn'}>
-        💊 {wrong ? 'The pill photos look wrong' : 'The pill photos were unclear'}
+        {wrong ? 'The pill photos look wrong' : 'The pill photos were unclear'}
       </AppText>
       <AppText>
         {wrong
